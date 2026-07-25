@@ -18,11 +18,14 @@ COPY requirements.txt .
 RUN pip install --upgrade pip \
     && pip install -r requirements.txt
 
+# Pre-download DeepFace Facenet weights during docker build for fast initial requests
+RUN python -c "from deepface import DeepFace; DeepFace.build_model('Facenet')"
+
 # Copy project files
 COPY . .
 
-# Expose port (Render will map $PORT)
+# Expose port (Railway will set $PORT dynamically)
 EXPOSE 8000
 
-# Start command (Render will inject $PORT)
-CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000"]
+# Start command (using shell form to dynamically bind to Railway's $PORT env var)
+CMD ["sh", "-c", "uvicorn main:app --host 0.0.0.0 --port ${PORT:-8000}"]
