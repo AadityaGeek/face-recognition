@@ -1,17 +1,24 @@
 package com.example.data
 
 import okhttp3.MultipartBody
+import okhttp3.OkHttpClient
 import okhttp3.RequestBody
 import okhttp3.ResponseBody
 import retrofit2.Response
+import retrofit2.Retrofit
+import retrofit2.converter.moshi.MoshiConverterFactory
 import retrofit2.http.GET
 import retrofit2.http.Multipart
 import retrofit2.http.POST
 import retrofit2.http.Part
 import retrofit2.http.Path
 import retrofit2.http.Query
+import java.util.concurrent.TimeUnit
+import com.squareup.moshi.Moshi
+import com.squareup.moshi.kotlin.reflect.KotlinJsonAdapterFactory
 
 interface FaceRecognitionService {
+
     @GET("/health")
     suspend fun checkStatus(): Response<ResponseBody>
 
@@ -20,6 +27,12 @@ interface FaceRecognitionService {
 
     @GET("/user/{user_id}")
     suspend fun getUser(@Path("user_id") userId: String): Response<ResponseBody>
+
+    @GET("/users/{user_id}")
+    suspend fun getUserAlt(@Path("user_id") userId: String): Response<ResponseBody>
+
+    @GET("/users")
+    suspend fun getAllUsers(): Response<ResponseBody>
 
     @Multipart
     @POST("/register")
@@ -39,6 +52,21 @@ interface FaceRecognitionService {
 }
 
 object FaceRecognitionApi {
+    private val moshi = Moshi.Builder()
+        .addLast(KotlinJsonAdapterFactory())
+        .build()
+
+    private val okHttpClient = OkHttpClient.Builder()
+        .connectTimeout(60, TimeUnit.SECONDS)
+        .readTimeout(60, TimeUnit.SECONDS)
+        .writeTimeout(60, TimeUnit.SECONDS)
+        .build()
+
     val service: FaceRecognitionService
-        get() = TODO("Implementation hidden")
+        get() = Retrofit.Builder()
+            .baseUrl(ApiConfig.BASE_URL)
+            .client(okHttpClient)
+            .addConverterFactory(MoshiConverterFactory.create(moshi))
+            .build()
+            .create(FaceRecognitionService::class.java)
 }
