@@ -69,4 +69,27 @@ object FaceRecognitionApi {
             .addConverterFactory(MoshiConverterFactory.create(moshi))
             .build()
             .create(FaceRecognitionService::class.java)
+
+    suspend fun checkStatusForUrl(baseUrl: String): Response<ResponseBody> {
+        var formattedUrl = baseUrl.trim()
+        if (!formattedUrl.startsWith("http://") && !formattedUrl.startsWith("https://")) {
+            formattedUrl = "http://$formattedUrl"
+        }
+        if (!formattedUrl.endsWith("/")) {
+            formattedUrl = "$formattedUrl/"
+        }
+        val testClient = OkHttpClient.Builder()
+            .connectTimeout(10, TimeUnit.SECONDS)
+            .readTimeout(10, TimeUnit.SECONDS)
+            .writeTimeout(10, TimeUnit.SECONDS)
+            .build()
+
+        return Retrofit.Builder()
+            .baseUrl(formattedUrl)
+            .client(testClient)
+            .addConverterFactory(MoshiConverterFactory.create(moshi))
+            .build()
+            .create(FaceRecognitionService::class.java)
+            .checkStatus()
+    }
 }

@@ -1763,7 +1763,17 @@ fun RegistrationScreen(
                                      state.message.lowercase().contains("conflict") ||
                                      state.message.lowercase().contains("multiple")
 
-                val friendlyMsg = if (state.message.contains("Application failed to respond") || state.message.contains("502") || state.message.contains("503")) {
+                val isImg1PathError = state.message.contains("img1_path", ignoreCase = true) || 
+                                     state.message.contains("Face could not be detected", ignoreCase = true)
+                val isOpenCvError = state.message.contains("CascadeClassifier", ignoreCase = true) || 
+                                    state.message.contains("cv2", ignoreCase = true) || 
+                                    state.message.contains("no attribute", ignoreCase = true)
+
+                val friendlyMsg = if (isImg1PathError) {
+                    "Backend Server Error: Face could not be detected in the profile photo by the server face recognition model."
+                } else if (isOpenCvError) {
+                    "Backend Server Error: OpenCV 'CascadeClassifier' module is missing or corrupt on the Python backend server."
+                } else if (state.message.contains("Application failed to respond") || state.message.contains("502") || state.message.contains("503")) {
                     "The biometrics backend server is temporarily unavailable or offline. Please check your connection or retry."
                 } else if (state.message.contains("Connection error") || state.message.contains("timeout") || state.message.contains("ConnectException")) {
                     "Unable to reach the biometrics backend. Please check your network connection."
@@ -1839,17 +1849,22 @@ fun RegistrationScreen(
                                 border = BorderStroke(1.dp, redColor.copy(alpha = 0.15f)),
                                 modifier = Modifier.fillMaxWidth()
                             ) {
-                                Text(
-                                    text = if (isRealDuplicate) {
-                                        "Security Protocol Rule: A duplicate biometric face fingerprint cannot be mapped to multiple credentials. Please update registration parameters or re-capture and submit again."
+                                Column(
+                                    modifier = Modifier.padding(12.dp),
+                                    verticalArrangement = Arrangement.spacedBy(6.dp)
+                                ) {
+                                    if (isImg1PathError) {
+                                        Text("• Cause: Face not detected in photo during server registration.", style = MaterialTheme.fontFamilyPairBold(11), color = redColor)
+                                        Text("• Solution: Re-capture with good lighting & direct camera alignment, or set enforce_detection=False in Python backend.", style = MaterialTheme.fontFamilyPairMedium(11), color = MaterialTheme.colorScheme.onSurface)
+                                    } else if (isOpenCvError) {
+                                        Text("• Cause: OpenCV package conflict or broken installation in Python.", style = MaterialTheme.fontFamilyPairBold(11), color = redColor)
+                                        Text("• Solution: Cleanly reinstall opencv-python in terminal:\npip uninstall opencv-python opencv-python-headless opencv-contrib-python -y\npip install opencv-python", style = MaterialTheme.fontFamilyPairMedium(11), color = MaterialTheme.colorScheme.onSurface)
+                                    } else if (isRealDuplicate) {
+                                        Text("Security Protocol Rule: A duplicate biometric face fingerprint cannot be mapped to multiple credentials. Please update registration parameters or re-capture and submit again.", style = MaterialTheme.fontFamilyPairMedium(11), color = MaterialTheme.colorScheme.onSurface, textAlign = TextAlign.Center)
                                     } else {
-                                        "System Notice: Biometric registration requires a successful handshake with the identity ledger. Please check network telemetry or adjust similarity thresholds."
-                                    },
-                                    style = MaterialTheme.fontFamilyPairMedium(11),
-                                    color = MaterialTheme.colorScheme.onSurface,
-                                    textAlign = TextAlign.Center,
-                                    modifier = Modifier.padding(12.dp)
-                                )
+                                        Text("System Notice: Biometric registration requires a successful handshake with the identity ledger. Please check network telemetry or adjust similarity thresholds.", style = MaterialTheme.fontFamilyPairMedium(11), color = MaterialTheme.colorScheme.onSurface, textAlign = TextAlign.Center)
+                                    }
+                                }
                             }
 
                             Row(
@@ -2684,7 +2699,17 @@ fun VerificationScreen(
                 val statusColor = if (state.isSuccess) greenColor else redColor
                 var showTechDetails by remember { mutableStateOf(false) }
 
-                val friendlyMsg = if (state.message.contains("Application failed to respond") || state.message.contains("502") || state.message.contains("503")) {
+                val isImg1PathError = state.message.contains("img1_path", ignoreCase = true) || 
+                                     state.message.contains("Face could not be detected", ignoreCase = true)
+                val isOpenCvError = state.message.contains("CascadeClassifier", ignoreCase = true) || 
+                                    state.message.contains("cv2", ignoreCase = true) || 
+                                    state.message.contains("no attribute", ignoreCase = true)
+
+                val friendlyMsg = if (isImg1PathError) {
+                    "Backend Server Error: The registered face photo (img1_path) could not be detected or processed by the server model."
+                } else if (isOpenCvError) {
+                    "Backend Server Error: OpenCV 'CascadeClassifier' module is missing or corrupt on the Python backend server."
+                } else if (state.message.contains("Application failed to respond") || state.message.contains("502") || state.message.contains("503")) {
                     "The biometrics backend server is temporarily unavailable or offline. Please retry in a few moments."
                 } else if (state.message.contains("Connection error") || state.message.contains("Connection failed") || state.message.contains("timeout")) {
                     "Unable to reach the biometrics backend. Please verify your internet connection and try again."
@@ -2780,11 +2805,62 @@ fun VerificationScreen(
                                                 tint = redColor,
                                                 modifier = Modifier.size(16.dp)
                                             )
-                                            Text("TROUBLESHOOTING TIPS", style = MaterialTheme.fontFamilyPairBold(11), color = redColor)
+                                            Text(
+                                                text = if (isImg1PathError || isOpenCvError) "PYTHON BACKEND RESOLUTION GUIDE" else "TROUBLESHOOTING TIPS",
+                                                style = MaterialTheme.fontFamilyPairBold(11),
+                                                color = redColor
+                                            )
                                         }
-                                        Text("• Verify that the entered User ID matches your registered profile.", style = MaterialTheme.fontFamilyPairMedium(12), color = MaterialTheme.colorScheme.onSurface)
-                                        Text("• Ensure clear lighting without harsh shadows or backlighting.", style = MaterialTheme.fontFamilyPairMedium(12), color = MaterialTheme.colorScheme.onSurface)
-                                        Text("• Face the camera straight and keep expression neutral during scan.", style = MaterialTheme.fontFamilyPairMedium(12), color = MaterialTheme.colorScheme.onSurface)
+
+                                        if (isImg1PathError) {
+                                            Text("• Root Cause: DeepFace model could not detect a face in the registered image (img1_path) saved on the server.", style = MaterialTheme.fontFamilyPairMedium(12), color = MaterialTheme.colorScheme.onSurface)
+                                            Text("• Fix 1 (User Action): Re-register this User ID with a clear, upright, well-lit face photo.", style = MaterialTheme.fontFamilyPairMedium(12), color = MaterialTheme.colorScheme.onSurface)
+                                            Text("• Fix 2 (Python Backend main.py): Add enforce_detection=False to DeepFace.verify():", style = MaterialTheme.fontFamilyPairMedium(12), color = MaterialTheme.colorScheme.onSurface)
+                                            Surface(
+                                                shape = RoundedCornerShape(6.dp),
+                                                color = MaterialTheme.colorScheme.surfaceVariant,
+                                                modifier = Modifier.fillMaxWidth().padding(vertical = 2.dp)
+                                            ) {
+                                                Text(
+                                                    text = "DeepFace.verify(img1_path, img2_path, enforce_detection=False)",
+                                                    style = MaterialTheme.fontFamilyPairBold(10),
+                                                    color = MaterialTheme.colorScheme.primary,
+                                                    modifier = Modifier.padding(8.dp)
+                                                )
+                                            }
+                                        } else if (isOpenCvError) {
+                                            Text("• Root Cause: OpenCV installation in Python is corrupt or conflicting packages (e.g. opencv-python and opencv-contrib-python) are interfering with each other.", style = MaterialTheme.fontFamilyPairMedium(12), color = MaterialTheme.colorScheme.onSurface)
+                                            Text("• Fix 1 (Terminal): Cleanly reinstall opencv-python:", style = MaterialTheme.fontFamilyPairMedium(12), color = MaterialTheme.colorScheme.onSurface)
+                                            Surface(
+                                                shape = RoundedCornerShape(6.dp),
+                                                color = MaterialTheme.colorScheme.surfaceVariant,
+                                                modifier = Modifier.fillMaxWidth().padding(vertical = 2.dp)
+                                            ) {
+                                                Text(
+                                                    text = "pip uninstall opencv-python opencv-python-headless opencv-contrib-python -y\npip install opencv-python",
+                                                    style = MaterialTheme.fontFamilyPairBold(10),
+                                                    color = MaterialTheme.colorScheme.primary,
+                                                    modifier = Modifier.padding(8.dp)
+                                                )
+                                            }
+                                            Text("• Fix 2 (Python Code): Use a robust detector backend in DeepFace.verify():", style = MaterialTheme.fontFamilyPairMedium(12), color = MaterialTheme.colorScheme.onSurface)
+                                            Surface(
+                                                shape = RoundedCornerShape(6.dp),
+                                                color = MaterialTheme.colorScheme.surfaceVariant,
+                                                modifier = Modifier.fillMaxWidth().padding(vertical = 2.dp)
+                                            ) {
+                                                Text(
+                                                    text = "DeepFace.verify(img1, img2, detector_backend='ssd', enforce_detection=False)",
+                                                    style = MaterialTheme.fontFamilyPairBold(10),
+                                                    color = MaterialTheme.colorScheme.primary,
+                                                    modifier = Modifier.padding(8.dp)
+                                                )
+                                            }
+                                        } else {
+                                            Text("• Verify that the entered User ID matches your registered profile.", style = MaterialTheme.fontFamilyPairMedium(12), color = MaterialTheme.colorScheme.onSurface)
+                                            Text("• Ensure clear lighting without harsh shadows or backlighting.", style = MaterialTheme.fontFamilyPairMedium(12), color = MaterialTheme.colorScheme.onSurface)
+                                            Text("• Face the camera straight and keep expression neutral during scan.", style = MaterialTheme.fontFamilyPairMedium(12), color = MaterialTheme.colorScheme.onSurface)
+                                        }
                                     }
                                 }
                             }
@@ -3710,11 +3786,19 @@ fun BackendUrlConfigDialog(
                     )
                     AssistChip(
                         onClick = {
-                            currentUrlInput = "http://192.168.1.100:8000/"
+                            currentUrlInput = "http://192.168.29.221:8000/"
                             testResultStatus = null
                         },
-                        label = { Text("Wi-Fi IP (192.168.x.x)", style = MaterialTheme.fontFamilyPairMedium(10)) },
+                        label = { Text("Local Wi-Fi IP", style = MaterialTheme.fontFamilyPairMedium(10)) },
                         leadingIcon = { Icon(Icons.Default.Wifi, contentDescription = null, modifier = Modifier.size(14.dp)) }
+                    )
+                    AssistChip(
+                        onClick = {
+                            currentUrlInput = "https://xxx.ngrok-free.app/"
+                            testResultStatus = null
+                        },
+                        label = { Text("ngrok Tunnel", style = MaterialTheme.fontFamilyPairMedium(10)) },
+                        leadingIcon = { Icon(Icons.Default.VpnKey, contentDescription = null, modifier = Modifier.size(14.dp)) }
                     )
                 }
 
@@ -3724,31 +3808,59 @@ fun BackendUrlConfigDialog(
                         horizontalArrangement = Arrangement.spacedBy(8.dp)
                     ) {
                         CircularProgressIndicator(modifier = Modifier.size(16.dp), strokeWidth = 2.dp)
-                        Text("Testing server health...", style = MaterialTheme.fontFamilyPairMedium(12))
+                        Text("Testing connection (10s timeout)...", style = MaterialTheme.fontFamilyPairMedium(12))
                     }
                 } else if (testResultStatus != null) {
                     val isSuccess = testResultStatus == "SUCCESS"
-                    Surface(
-                        color = if (isSuccess) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.errorContainer,
-                        shape = RoundedCornerShape(8.dp),
-                        modifier = Modifier.fillMaxWidth()
+                    Column(
+                        verticalArrangement = Arrangement.spacedBy(8.dp)
                     ) {
-                        Row(
-                            modifier = Modifier.padding(10.dp),
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                        Surface(
+                            color = if (isSuccess) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.errorContainer,
+                            shape = RoundedCornerShape(8.dp),
+                            modifier = Modifier.fillMaxWidth()
                         ) {
-                            Icon(
-                                imageVector = if (isSuccess) Icons.Default.CheckCircle else Icons.Default.Error,
-                                contentDescription = null,
-                                tint = if (isSuccess) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.error,
-                                modifier = Modifier.size(18.dp)
-                            )
-                            Text(
-                                text = if (isSuccess) "Connection Successful" else testResultStatus!!,
-                                style = MaterialTheme.fontFamilyPairMedium(11),
-                                color = if (isSuccess) MaterialTheme.colorScheme.onPrimaryContainer else MaterialTheme.colorScheme.onErrorContainer
-                            )
+                            Row(
+                                modifier = Modifier.padding(10.dp),
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(8.dp)
+                            ) {
+                                Icon(
+                                    imageVector = if (isSuccess) Icons.Default.CheckCircle else Icons.Default.Error,
+                                    contentDescription = null,
+                                    tint = if (isSuccess) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.error,
+                                    modifier = Modifier.size(18.dp)
+                                )
+                                Text(
+                                    text = if (isSuccess) "Connection Successful!" else testResultStatus!!,
+                                    style = MaterialTheme.fontFamilyPairMedium(11),
+                                    color = if (isSuccess) MaterialTheme.colorScheme.onPrimaryContainer else MaterialTheme.colorScheme.onErrorContainer
+                                )
+                            }
+                        }
+
+                        if (!isSuccess && currentUrlInput.contains("192.168.")) {
+                            Surface(
+                                color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.7f),
+                                shape = RoundedCornerShape(8.dp),
+                                modifier = Modifier.fillMaxWidth()
+                            ) {
+                                Column(
+                                    modifier = Modifier.padding(10.dp),
+                                    verticalArrangement = Arrangement.spacedBy(4.dp)
+                                ) {
+                                    Text(
+                                        text = "💡 Local IP Troubleshooting:",
+                                        style = MaterialTheme.fontFamilyPairBold(11),
+                                        color = MaterialTheme.colorScheme.primary
+                                    )
+                                    Text(
+                                        text = "1. Bind Host to 0.0.0.0:\n   uvicorn main:app --host 0.0.0.0 --port 8000\n2. Windows/Mac Firewall:\n   Allow inbound port 8000.\n3. Recommended Alternative:\n   Run 'ngrok http 8000' for instant HTTPS tunnel.",
+                                        style = MaterialTheme.fontFamilyPairMedium(10),
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                                    )
+                                }
+                            }
                         }
                     }
                 }
@@ -3758,10 +3870,9 @@ fun BackendUrlConfigDialog(
                         testingConnection = true
                         testResultStatus = null
                         val tempUrl = currentUrlInput
-                        com.example.data.ApiConfig.updateBaseUrl(context, tempUrl)
                         coroutineScope.launch {
                             try {
-                                val response = com.example.data.FaceRecognitionApi.service.checkStatus()
+                                val response = com.example.data.FaceRecognitionApi.checkStatusForUrl(tempUrl)
                                 if (response.isSuccessful) {
                                     testResultStatus = "SUCCESS"
                                 } else {
