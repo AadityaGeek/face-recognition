@@ -39,7 +39,12 @@ async def register_user(
         return {"success": False, "error": "Invalid image"}
 
     try:
-        embedding = DeepFace.represent(img, model_name="Facenet")[0]["embedding"]
+        embedding = DeepFace.represent(
+            img,
+            model_name="Facenet",
+            detector_backend="opencv",
+            enforce_detection=False
+        )[0]["embedding"]
     except Exception as e:
         return {"success": False, "error": f"Face embedding failed: {str(e)}"}
 
