@@ -12,6 +12,8 @@ import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.scaleIn
 import androidx.compose.animation.scaleOut
+import androidx.compose.animation.slideInHorizontally
+import androidx.compose.animation.slideOutHorizontally
 import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.*
 import androidx.compose.foundation.layout.*
@@ -37,6 +39,7 @@ import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
@@ -61,6 +64,7 @@ import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.PathEffect
 import androidx.compose.ui.graphics.vector.ImageVector
 import com.example.util.QrCodeGenerator
+import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import android.provider.OpenableColumns
@@ -91,7 +95,7 @@ class MainActivity : ComponentActivity() {
 enum class NavigationTab(val label: String, val icon: androidx.compose.ui.graphics.vector.ImageVector) {
     REGISTER("Register", Icons.Default.PersonAdd),
     VERIFY("Verify", Icons.Default.Security),
-    ABOUT("About", Icons.Default.Info)
+    MORE("More", Icons.Default.MoreHoriz)
 }
 
 @Composable
@@ -230,9 +234,15 @@ fun MainAppPortal(
         else -> "APP"
     }
 
+    if (!showLandingPage && !showSplashScreen) {
+        BackHandler {
+            showLandingPage = true
+        }
+    }
+
     Crossfade(
         targetState = screenState,
-        animationSpec = tween(400),
+        animationSpec = tween(220, easing = FastOutSlowInEasing),
         label = "app_navigation_crossfade"
     ) { state ->
         when (state) {
@@ -253,8 +263,8 @@ fun MainAppPortal(
                     },
                     isDarkTheme = isDarkTheme,
                     onThemeToggle = onThemeToggle,
-                    onAboutClick = {
-                        currentTab = NavigationTab.ABOUT
+                    onMoreClick = {
+                        currentTab = NavigationTab.MORE
                         showLandingPage = false
                     }
                 )
@@ -277,39 +287,30 @@ fun MainAppPortal(
                             horizontalArrangement = Arrangement.spacedBy(10.dp)
                         ) {
                             Icon(
-                                imageVector = Icons.Default.Fingerprint,
+                                imageVector = when (currentTab) {
+                                    NavigationTab.REGISTER -> Icons.Default.PersonAdd
+                                    NavigationTab.VERIFY -> Icons.Default.Security
+                                    NavigationTab.MORE -> Icons.Default.MoreHoriz
+                                },
                                 contentDescription = null,
                                 tint = MaterialTheme.colorScheme.primary,
                                 modifier = Modifier.size(24.dp)
                             )
                             Text(
-                                text = if (currentTab == NavigationTab.REGISTER) "Biometric Registration" else "Liveness Verification",
+                                text = when (currentTab) {
+                                    NavigationTab.REGISTER -> "Biometric Registration"
+                                    NavigationTab.VERIFY -> "Liveness Verification"
+                                    NavigationTab.MORE -> "Services & Utilities"
+                                },
                                 style = MaterialTheme.fontFamilyPairBold(16),
                                 color = MaterialTheme.colorScheme.onSurface
                             )
                         }
 
                         Row(
-                            horizontalArrangement = Arrangement.spacedBy(14.dp),
+                            horizontalArrangement = Arrangement.spacedBy(18.dp),
                             verticalAlignment = Alignment.CenterVertically
                         ) {
-                            IconButton(
-                                onClick = { currentTab = NavigationTab.ABOUT },
-                                modifier = Modifier
-                                    .size(36.dp)
-                                    .background(
-                                        MaterialTheme.colorScheme.surfaceVariant,
-                                        shape = CircleShape
-                                    )
-                            ) {
-                                Icon(
-                                    imageVector = Icons.Default.Info,
-                                    contentDescription = "About App and Developer",
-                                    tint = MaterialTheme.colorScheme.primary,
-                                    modifier = Modifier.size(18.dp)
-                                )
-                            }
-
                             val topThemeRotation by animateFloatAsState(
                                 targetValue = if (isDarkTheme) 180f else 0f,
                                 animationSpec = tween(350, easing = FastOutSlowInEasing),
@@ -318,7 +319,7 @@ fun MainAppPortal(
                             IconButton(
                                 onClick = onThemeToggle,
                                 modifier = Modifier
-                                    .size(36.dp)
+                                    .size(42.dp)
                                     .background(
                                         MaterialTheme.colorScheme.surfaceVariant,
                                         shape = CircleShape
@@ -329,7 +330,7 @@ fun MainAppPortal(
                                     contentDescription = "Toggle Theme",
                                     tint = MaterialTheme.colorScheme.primary,
                                     modifier = Modifier
-                                        .size(18.dp)
+                                        .size(20.dp)
                                         .graphicsLayer { rotationZ = topThemeRotation }
                                 )
                             }
@@ -337,7 +338,7 @@ fun MainAppPortal(
                             IconButton(
                                 onClick = { showLandingPage = true },
                                 modifier = Modifier
-                                    .size(36.dp)
+                                    .size(42.dp)
                                     .background(
                                         MaterialTheme.colorScheme.surfaceVariant,
                                         shape = CircleShape
@@ -347,7 +348,7 @@ fun MainAppPortal(
                                     imageVector = Icons.Default.Home,
                                     contentDescription = "Return to Landing Page",
                                     tint = MaterialTheme.colorScheme.primary,
-                                    modifier = Modifier.size(20.dp)
+                                    modifier = Modifier.size(22.dp)
                                 )
                             }
                         }
@@ -386,8 +387,13 @@ fun MainAppPortal(
                     AnimatedContent(
                         targetState = currentTab,
                         transitionSpec = {
-                            (fadeIn(animationSpec = tween(220)) + scaleIn(initialScale = 0.98f, animationSpec = tween(220)))
-                                .togetherWith(fadeOut(animationSpec = tween(180)))
+                            val direction = if (targetState.ordinal > initialState.ordinal) 1 else -1
+                            (slideInHorizontally(animationSpec = tween(220, easing = FastOutSlowInEasing)) { width -> direction * (width / 5) } +
+                                    fadeIn(animationSpec = tween(220)))
+                                .togetherWith(
+                                    slideOutHorizontally(animationSpec = tween(180, easing = FastOutSlowInEasing)) { width -> -direction * (width / 5) } +
+                                            fadeOut(animationSpec = tween(180))
+                                )
                         },
                         label = "tab_transitions"
                     ) { tab ->
@@ -409,11 +415,13 @@ fun MainAppPortal(
                                     }
                                 )
                             }
-                            NavigationTab.ABOUT -> {
-                                AboutScreen(
+                            NavigationTab.MORE -> {
+                                MoreServicesScreen(
                                     onBackToHome = {
                                         showLandingPage = true
-                                    }
+                                    },
+                                    isDarkTheme = isDarkTheme,
+                                    onThemeToggle = onThemeToggle
                                 )
                             }
                         }
@@ -431,678 +439,934 @@ fun LandingPageScreen(
     onVerifyClick: () -> Unit,
     isDarkTheme: Boolean,
     onThemeToggle: () -> Unit,
-    onAboutClick: () -> Unit
+    onMoreClick: () -> Unit
 ) {
-    Column(
+    BoxWithConstraints(
         modifier = Modifier
             .fillMaxSize()
-            .verticalScroll(rememberScrollState())
             .background(MaterialTheme.colorScheme.background)
-            .padding(24.dp),
-        horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.spacedBy(20.dp)
     ) {
-        // Theme, Info & Server Settings Action Buttons at the Top Row
-        Row(
+        val maxWidth = this.maxWidth
+        val isWideScreen = maxWidth > 600.dp
+        val contentPaddingHorizontal = if (isWideScreen) 32.dp else 20.dp
+
+        Column(
             modifier = Modifier
-                .fillMaxWidth()
-                .statusBarsPadding(),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically
+                .fillMaxSize()
+                .verticalScroll(rememberScrollState())
+                .padding(horizontal = contentPaddingHorizontal, vertical = 20.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.spacedBy(18.dp)
         ) {
-            IconButton(
-                onClick = onAboutClick,
+            Box(
                 modifier = Modifier
-                    .size(40.dp)
-                    .background(
-                        MaterialTheme.colorScheme.surfaceVariant,
-                        shape = CircleShape
-                    )
+                    .fillMaxWidth()
+                    .widthIn(max = 640.dp)
             ) {
-                Icon(
-                    imageVector = Icons.Default.Info,
-                    contentDescription = "About App and Developer",
-                    tint = MaterialTheme.colorScheme.primary,
-                    modifier = Modifier.size(20.dp)
-                )
-            }
-
-            Row(
-                horizontalArrangement = Arrangement.spacedBy(14.dp),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                val landingThemeRotation by animateFloatAsState(
-                    targetValue = if (isDarkTheme) 180f else 0f,
-                    animationSpec = tween(350, easing = FastOutSlowInEasing),
-                    label = "LandingThemeRotation"
-                )
-                IconButton(
-                    onClick = onThemeToggle,
-                    modifier = Modifier
-                        .size(40.dp)
-                        .background(
-                            MaterialTheme.colorScheme.surfaceVariant,
-                            shape = CircleShape
-                        )
+                Column(
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.spacedBy(18.dp)
                 ) {
-                    Icon(
-                        imageVector = if (isDarkTheme) Icons.Default.LightMode else Icons.Default.DarkMode,
-                        contentDescription = "Toggle Theme",
-                        tint = MaterialTheme.colorScheme.primary,
+                    // Theme & More Services Action Buttons at the Top Row
+                    Row(
                         modifier = Modifier
-                            .size(20.dp)
-                            .graphicsLayer { rotationZ = landingThemeRotation }
-                    )
-                }
-            }
-        }
+                            .fillMaxWidth()
+                            .statusBarsPadding()
+                            .padding(vertical = 4.dp),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        IconButton(
+                            onClick = onMoreClick,
+                            modifier = Modifier
+                                .size(44.dp)
+                                .background(
+                                    MaterialTheme.colorScheme.surfaceVariant,
+                                    shape = CircleShape
+                                )
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.MoreHoriz,
+                                contentDescription = "More Services & Utilities",
+                                tint = MaterialTheme.colorScheme.primary,
+                                modifier = Modifier.size(22.dp)
+                            )
+                        }
 
-        // Brand Logo and Title
-        Row(
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(10.dp)
-        ) {
-            Icon(
-                imageVector = Icons.Default.Fingerprint,
-                contentDescription = null,
-                tint = MaterialTheme.colorScheme.primary,
-                modifier = Modifier.size(42.dp)
-            )
-            Text(
-                text = "Liveness Shield",
-                style = MaterialTheme.fontFamilyPairBold(26),
-                color = MaterialTheme.colorScheme.onBackground
-            )
-        }
+                        val landingThemeRotation by animateFloatAsState(
+                            targetValue = if (isDarkTheme) 180f else 0f,
+                            animationSpec = tween(350, easing = FastOutSlowInEasing),
+                            label = "LandingThemeRotation"
+                        )
+                        IconButton(
+                            onClick = onThemeToggle,
+                            modifier = Modifier
+                                .size(44.dp)
+                                .background(
+                                    MaterialTheme.colorScheme.surfaceVariant,
+                                    shape = CircleShape
+                                )
+                        ) {
+                            Icon(
+                                imageVector = if (isDarkTheme) Icons.Default.LightMode else Icons.Default.DarkMode,
+                                contentDescription = "Toggle Theme",
+                                tint = MaterialTheme.colorScheme.primary,
+                                modifier = Modifier
+                                    .size(22.dp)
+                                    .graphicsLayer { rotationZ = landingThemeRotation }
+                            )
+                        }
+                    }
 
-        Text(
-            text = "Biometric Identity Registration & Server-Verified Anti-Spoofing",
-            style = MaterialTheme.fontFamilyPairMedium(13),
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-            textAlign = TextAlign.Center,
-            modifier = Modifier.padding(horizontal = 16.dp)
-        )
+                    // Brand Logo and Title
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(10.dp)
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Fingerprint,
+                            contentDescription = null,
+                            tint = MaterialTheme.colorScheme.primary,
+                            modifier = Modifier.size(42.dp)
+                        )
+                        Text(
+                            text = "Liveness Shield",
+                            style = MaterialTheme.fontFamilyPairBold(26),
+                            color = MaterialTheme.colorScheme.onBackground
+                        )
+                    }
 
-        Spacer(modifier = Modifier.height(4.dp))
-
-        // Scanning Ring Illustration
-        Box(
-            modifier = Modifier
-                .size(170.dp)
-                .clip(CircleShape)
-                .background(MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.15f)),
-            contentAlignment = Alignment.Center
-        ) {
-            BiometricScanningRing()
-            Icon(
-                imageVector = Icons.Default.Face,
-                contentDescription = null,
-                tint = MaterialTheme.colorScheme.primary,
-                modifier = Modifier.size(76.dp)
-            )
-        }
-
-        Spacer(modifier = Modifier.height(4.dp))
-
-        // Register Action Card
-        Card(
-            onClick = onRegisterClick,
-            modifier = Modifier.fillMaxWidth(),
-            shape = RoundedCornerShape(16.dp),
-            colors = CardDefaults.cardColors(
-                containerColor = MaterialTheme.colorScheme.surface
-            ),
-            elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
-        ) {
-            Row(
-                modifier = Modifier.padding(20.dp),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(16.dp)
-            ) {
-                Box(
-                    modifier = Modifier
-                        .size(48.dp)
-                        .clip(RoundedCornerShape(12.dp))
-                        .background(MaterialTheme.colorScheme.primaryContainer),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Icon(
-                        imageVector = Icons.Default.PersonAdd,
-                        contentDescription = null,
-                        tint = MaterialTheme.colorScheme.primary,
-                        modifier = Modifier.size(24.dp)
-                    )
-                }
-                Column(modifier = Modifier.weight(1f)) {
                     Text(
-                        text = "1. Register Identity",
-                        style = MaterialTheme.fontFamilyPairBold(16),
-                        color = MaterialTheme.colorScheme.onSurface
-                    )
-                    Spacer(modifier = Modifier.height(4.dp))
-                    Text(
-                        text = "Create secure digital credentials. Enroll your face reference with server-verified anti-spoofing protection and generate a QR code.",
-                        style = MaterialTheme.fontFamilyPairMedium(11),
+                        text = "Biometric Identity Registration & Server-Verified Anti-Spoofing",
+                        style = MaterialTheme.fontFamilyPairMedium(13),
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        lineHeight = 16.sp
+                        textAlign = TextAlign.Center,
+                        modifier = Modifier.padding(horizontal = 16.dp)
                     )
-                }
-                Icon(
-                    imageVector = Icons.Default.ChevronRight,
-                    contentDescription = null,
-                    tint = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-            }
-        }
 
-        // Verify Action Card
-        Card(
-            onClick = onVerifyClick,
-            modifier = Modifier.fillMaxWidth(),
-            shape = RoundedCornerShape(16.dp),
-            colors = CardDefaults.cardColors(
-                containerColor = MaterialTheme.colorScheme.surface
-            ),
-            elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
-        ) {
-            Row(
-                modifier = Modifier.padding(20.dp),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(16.dp)
-            ) {
-                Box(
-                    modifier = Modifier
-                        .size(48.dp)
-                        .clip(RoundedCornerShape(12.dp))
-                        .background(MaterialTheme.colorScheme.secondaryContainer),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Icon(
-                        imageVector = Icons.Default.Security,
-                        contentDescription = null,
-                        tint = MaterialTheme.colorScheme.secondary,
-                        modifier = Modifier.size(24.dp)
-                    )
-                }
-                Column(modifier = Modifier.weight(1f)) {
-                    Text(
-                        text = "2. Verify Liveness",
-                        style = MaterialTheme.fontFamilyPairBold(16),
-                        color = MaterialTheme.colorScheme.onSurface
-                    )
+                    Spacer(modifier = Modifier.height(2.dp))
+
+                    // Scanning Ring Illustration
+                    Box(
+                        modifier = Modifier
+                            .size(160.dp)
+                            .clip(CircleShape)
+                            .background(MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.15f)),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        BiometricScanningRing()
+                        Icon(
+                            imageVector = Icons.Default.Face,
+                            contentDescription = null,
+                            tint = MaterialTheme.colorScheme.primary,
+                            modifier = Modifier.size(68.dp)
+                        )
+                    }
+
                     Spacer(modifier = Modifier.height(4.dp))
-                    Text(
-                        text = "Conduct live interactive camera spoof checks. Scan QR credentials to map biometric similarities instantly.",
-                        style = MaterialTheme.fontFamilyPairMedium(11),
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        lineHeight = 16.sp
-                    )
+
+                    // Register Action Card
+                    Card(
+                        onClick = onRegisterClick,
+                        modifier = Modifier.fillMaxWidth(),
+                        shape = RoundedCornerShape(16.dp),
+                        colors = CardDefaults.cardColors(
+                            containerColor = MaterialTheme.colorScheme.surface
+                        ),
+                        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
+                    ) {
+                        Row(
+                            modifier = Modifier.padding(18.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(16.dp)
+                        ) {
+                            Box(
+                                modifier = Modifier
+                                    .size(48.dp)
+                                    .clip(RoundedCornerShape(12.dp))
+                                    .background(MaterialTheme.colorScheme.primaryContainer),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.PersonAdd,
+                                    contentDescription = null,
+                                    tint = MaterialTheme.colorScheme.primary,
+                                    modifier = Modifier.size(24.dp)
+                                )
+                            }
+                            Column(modifier = Modifier.weight(1f)) {
+                                Text(
+                                    text = "1. Register Identity Profile",
+                                    style = MaterialTheme.fontFamilyPairBold(16),
+                                    color = MaterialTheme.colorScheme.onSurface
+                                )
+                                Spacer(modifier = Modifier.height(4.dp))
+                                Text(
+                                    text = "Create secure digital credentials. Enroll your face reference with anti-spoofing verification and generate QR profile.",
+                                    style = MaterialTheme.fontFamilyPairMedium(11),
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    lineHeight = 16.sp
+                                )
+                            }
+                            Icon(
+                                imageVector = Icons.Default.ChevronRight,
+                                contentDescription = null,
+                                tint = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+                    }
+
+                    // Verify Action Card
+                    Card(
+                        onClick = onVerifyClick,
+                        modifier = Modifier.fillMaxWidth(),
+                        shape = RoundedCornerShape(16.dp),
+                        colors = CardDefaults.cardColors(
+                            containerColor = MaterialTheme.colorScheme.surface
+                        ),
+                        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
+                    ) {
+                        Row(
+                            modifier = Modifier.padding(18.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(16.dp)
+                        ) {
+                            Box(
+                                modifier = Modifier
+                                    .size(48.dp)
+                                    .clip(RoundedCornerShape(12.dp))
+                                    .background(MaterialTheme.colorScheme.secondaryContainer),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.Security,
+                                    contentDescription = null,
+                                    tint = MaterialTheme.colorScheme.secondary,
+                                    modifier = Modifier.size(24.dp)
+                                )
+                            }
+                            Column(modifier = Modifier.weight(1f)) {
+                                Text(
+                                    text = "2. Verify Liveness Scan",
+                                    style = MaterialTheme.fontFamilyPairBold(16),
+                                    color = MaterialTheme.colorScheme.onSurface
+                                )
+                                Spacer(modifier = Modifier.height(4.dp))
+                                Text(
+                                    text = "Conduct live camera spoof checks. Scan QR code or enter User ID to map biometric similarities instantly.",
+                                    style = MaterialTheme.fontFamilyPairMedium(11),
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    lineHeight = 16.sp
+                                )
+                            }
+                            Icon(
+                                imageVector = Icons.Default.ChevronRight,
+                                contentDescription = null,
+                                tint = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+                    }
+
+                    // Security / Stats Footnote
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clip(RoundedCornerShape(12.dp))
+                            .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f))
+                            .padding(horizontal = 12.dp, vertical = 10.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.Center
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Lock,
+                            contentDescription = null,
+                            tint = MaterialTheme.colorScheme.secondary,
+                            modifier = Modifier.size(16.dp)
+                        )
+                        Spacer(modifier = Modifier.width(6.dp))
+                        Text(
+                            text = "Encrypted Transmission & Server Biometric Verification",
+                            style = MaterialTheme.fontFamilyPairMedium(11),
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            textAlign = TextAlign.Center,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
+                        )
+                    }
                 }
-                Icon(
-                    imageVector = Icons.Default.ChevronRight,
-                    contentDescription = null,
-                    tint = MaterialTheme.colorScheme.onSurfaceVariant
-                )
             }
-        }
-
-        Spacer(modifier = Modifier.height(8.dp))
-
-        // Security / Stats Footnote
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .clip(RoundedCornerShape(12.dp))
-                .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f))
-                .padding(horizontal = 12.dp, vertical = 10.dp),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.Center
-        ) {
-            Icon(
-                imageVector = Icons.Default.Lock,
-                contentDescription = null,
-                tint = MaterialTheme.colorScheme.secondary,
-                modifier = Modifier.size(16.dp)
-            )
-            Spacer(modifier = Modifier.width(6.dp))
-            Text(
-                text = "Encrypted Transmission & Server Biometric Verification",
-                style = MaterialTheme.fontFamilyPairMedium(11),
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                textAlign = TextAlign.Center,
-                maxLines = 1,
-                overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis
-            )
         }
     }
 }
 
 @Composable
-fun AboutScreen(
-    onBackToHome: () -> Unit
+fun MoreServicesScreen(
+    onBackToHome: () -> Unit,
+    isDarkTheme: Boolean,
+    onThemeToggle: () -> Unit
 ) {
-    var aboutTabState by remember { mutableStateOf(0) } // 0 = About App, 1 = About Developer
-    var showMoreMenu by remember { mutableStateOf(false) }
-    var showDeveloperDialog by remember { mutableStateOf(false) }
     var showBackendUrlDialog by remember { mutableStateOf(false) }
+    var showFullAboutPage by remember { mutableStateOf(false) }
 
-    Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .verticalScroll(rememberScrollState())
-            .padding(horizontal = 24.dp, vertical = 24.dp),
-        verticalArrangement = Arrangement.spacedBy(16.dp)
-    ) {
-        // Header card
-        Card(
-            modifier = Modifier.fillMaxWidth(),
-            shape = RoundedCornerShape(24.dp),
-            colors = CardDefaults.cardColors(
-                containerColor = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.4f)
-            )
-        ) {
-            Row(
+    BackHandler {
+        if (showBackendUrlDialog) {
+            showBackendUrlDialog = false
+        } else if (showFullAboutPage) {
+            showFullAboutPage = false
+        } else {
+            onBackToHome()
+        }
+    }
+
+    AnimatedContent(
+        targetState = showFullAboutPage,
+        transitionSpec = {
+            if (targetState) {
+                (slideInHorizontally(animationSpec = tween(220, easing = FastOutSlowInEasing)) { width -> width / 4 } +
+                        fadeIn(animationSpec = tween(220)))
+                    .togetherWith(
+                        slideOutHorizontally(animationSpec = tween(180, easing = FastOutSlowInEasing)) { width -> -width / 4 } +
+                                fadeOut(animationSpec = tween(180))
+                    )
+            } else {
+                (slideInHorizontally(animationSpec = tween(220, easing = FastOutSlowInEasing)) { width -> -width / 4 } +
+                        fadeIn(animationSpec = tween(220)))
+                    .togetherWith(
+                        slideOutHorizontally(animationSpec = tween(180, easing = FastOutSlowInEasing)) { width -> width / 4 } +
+                                fadeOut(animationSpec = tween(180))
+                    )
+            }
+        },
+        label = "more_services_subpage_transition"
+    ) { isAboutPage ->
+        if (isAboutPage) {
+            FullAboutPageScreen(onBack = { showFullAboutPage = false })
+        } else {
+            BoxWithConstraints(
                 modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(20.dp),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.SpaceBetween
+                    .fillMaxSize()
+                    .background(MaterialTheme.colorScheme.background)
             ) {
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(16.dp),
-                    modifier = Modifier.weight(1f)
+                val maxWidth = this.maxWidth
+                val isWideScreen = maxWidth > 600.dp
+                val contentPaddingHorizontal = if (isWideScreen) 32.dp else 18.dp
+
+                Column(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .verticalScroll(rememberScrollState())
+                        .padding(horizontal = contentPaddingHorizontal, vertical = 20.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.spacedBy(16.dp)
                 ) {
-                    Box(
-                        modifier = Modifier
-                            .size(48.dp)
-                            .background(MaterialTheme.colorScheme.primary, CircleShape),
-                        contentAlignment = Alignment.Center
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .widthIn(max = 640.dp)
+                ) {
+                    Column(
+                        verticalArrangement = Arrangement.spacedBy(16.dp)
                     ) {
-                        Icon(
-                            imageVector = Icons.Default.Info,
-                            contentDescription = null,
-                            tint = MaterialTheme.colorScheme.onPrimary,
-                            modifier = Modifier.size(24.dp)
-                        )
-                    }
-                    Column {
+                        // Header Card
+                        Card(
+                            modifier = Modifier.fillMaxWidth(),
+                            shape = RoundedCornerShape(24.dp),
+                            colors = CardDefaults.cardColors(
+                                containerColor = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.35f)
+                            )
+                        ) {
+                            Column(
+                                modifier = Modifier.padding(20.dp),
+                                verticalArrangement = Arrangement.spacedBy(12.dp)
+                            ) {
+                                Row(
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.spacedBy(14.dp)
+                                ) {
+                                    Box(
+                                        modifier = Modifier
+                                            .size(48.dp)
+                                            .background(MaterialTheme.colorScheme.primary, CircleShape),
+                                        contentAlignment = Alignment.Center
+                                    ) {
+                                        Icon(
+                                            imageVector = Icons.Default.MoreHoriz,
+                                            contentDescription = null,
+                                            tint = MaterialTheme.colorScheme.onPrimary,
+                                            modifier = Modifier.size(24.dp)
+                                        )
+                                    }
+                                    Column(modifier = Modifier.weight(1f)) {
+                                        Text(
+                                            text = "Services & Utilities",
+                                            style = MaterialTheme.fontFamilyPairBold(20),
+                                            color = MaterialTheme.colorScheme.onSurface
+                                        )
+                                        Text(
+                                            text = "Configure API endpoints, view app identity, and manage theme options",
+                                            style = MaterialTheme.fontFamilyPairMedium(12),
+                                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                                        )
+                                    }
+                                }
+                            }
+                        }
+
+                        // Section Title
                         Text(
-                            text = "Information Hub",
-                            style = MaterialTheme.fontFamilyPairBold(20),
-                            color = MaterialTheme.colorScheme.onPrimaryContainer
+                            text = "AVAILABLE OPTIONS",
+                            style = MaterialTheme.fontFamilyPairBold(12),
+                            color = MaterialTheme.colorScheme.primary,
+                            modifier = Modifier.padding(start = 4.dp, top = 4.dp)
                         )
-                        Text(
-                            text = "App and Developer details",
-                            style = MaterialTheme.fontFamilyPairMedium(12),
-                            color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.8f)
-                        )
+
+                        // Option List (Simple List Container)
+                        Surface(
+                            modifier = Modifier.fillMaxWidth(),
+                            shape = RoundedCornerShape(16.dp),
+                            color = MaterialTheme.colorScheme.surface,
+                            border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f))
+                        ) {
+                            Column {
+                                // Option 1: Backend Server URL
+                                Row(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .clickable { showBackendUrlDialog = true }
+                                        .padding(horizontal = 16.dp, vertical = 16.dp),
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.spacedBy(14.dp)
+                                ) {
+                                    Box(
+                                        modifier = Modifier
+                                            .size(38.dp)
+                                            .clip(CircleShape)
+                                            .background(MaterialTheme.colorScheme.primaryContainer),
+                                        contentAlignment = Alignment.Center
+                                    ) {
+                                        Icon(
+                                            imageVector = Icons.Default.Dns,
+                                            contentDescription = null,
+                                            tint = MaterialTheme.colorScheme.primary,
+                                            modifier = Modifier.size(18.dp)
+                                        )
+                                    }
+                                    Text(
+                                        text = "Backend Server URL",
+                                        style = MaterialTheme.fontFamilyPairBold(14),
+                                        color = MaterialTheme.colorScheme.onSurface,
+                                        modifier = Modifier.weight(1f)
+                                    )
+                                    Icon(
+                                        imageVector = Icons.Default.ChevronRight,
+                                        contentDescription = null,
+                                        tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f),
+                                        modifier = Modifier.size(20.dp)
+                                    )
+                                }
+
+                                HorizontalDivider(
+                                    modifier = Modifier.padding(horizontal = 16.dp),
+                                    color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.3f)
+                                )
+
+                                // Option 2: About Us & Application Details
+                                Row(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .clickable { showFullAboutPage = true }
+                                        .padding(horizontal = 16.dp, vertical = 16.dp),
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.spacedBy(14.dp)
+                                ) {
+                                    Box(
+                                        modifier = Modifier
+                                            .size(38.dp)
+                                            .clip(CircleShape)
+                                            .background(MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.7f)),
+                                        contentAlignment = Alignment.Center
+                                    ) {
+                                        Icon(
+                                            imageVector = Icons.Default.Info,
+                                            contentDescription = null,
+                                            tint = MaterialTheme.colorScheme.secondary,
+                                            modifier = Modifier.size(18.dp)
+                                        )
+                                    }
+                                    Text(
+                                        text = "About Us & Application Details",
+                                        style = MaterialTheme.fontFamilyPairBold(14),
+                                        color = MaterialTheme.colorScheme.onSurface,
+                                        modifier = Modifier.weight(1f)
+                                    )
+                                    Icon(
+                                        imageVector = Icons.Default.ChevronRight,
+                                        contentDescription = null,
+                                        tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f),
+                                        modifier = Modifier.size(20.dp)
+                                    )
+                                }
+
+                                HorizontalDivider(
+                                    modifier = Modifier.padding(horizontal = 16.dp),
+                                    color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.3f)
+                                )
+
+                                // Option 3: Dark Theme Toggle
+                                Row(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .padding(horizontal = 16.dp, vertical = 10.dp),
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.spacedBy(14.dp)
+                                ) {
+                                    Box(
+                                        modifier = Modifier
+                                            .size(38.dp)
+                                            .clip(CircleShape)
+                                            .background(MaterialTheme.colorScheme.surfaceVariant),
+                                        contentAlignment = Alignment.Center
+                                    ) {
+                                        Icon(
+                                            imageVector = if (isDarkTheme) Icons.Default.DarkMode else Icons.Default.LightMode,
+                                            contentDescription = null,
+                                            tint = MaterialTheme.colorScheme.primary,
+                                            modifier = Modifier.size(18.dp)
+                                        )
+                                    }
+                                    Text(
+                                        text = "Dark Theme",
+                                        style = MaterialTheme.fontFamilyPairBold(14),
+                                        color = MaterialTheme.colorScheme.onSurface,
+                                        modifier = Modifier.weight(1f)
+                                    )
+                                    Switch(
+                                        checked = isDarkTheme,
+                                        onCheckedChange = { onThemeToggle() }
+                                    )
+                                }
+                            }
+                        }
+
+                        Spacer(modifier = Modifier.height(8.dp))
+
+                        Button(
+                            onClick = onBackToHome,
+                            modifier = Modifier.fillMaxWidth(),
+                            shape = RoundedCornerShape(12.dp)
+                        ) {
+                            Icon(imageVector = Icons.Default.Home, contentDescription = null)
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Text("Back to Landing Screen", style = MaterialTheme.fontFamilyPairBold(14))
+                        }
                     }
                 }
+            }
+        }
+    }
+}
 
-                // 3 dots menu
-                Box {
-                    IconButton(
-                        onClick = { showMoreMenu = true }
+    // Dialogs
+    if (showBackendUrlDialog) {
+        BackendUrlConfigDialog(onDismiss = { showBackendUrlDialog = false })
+    }
+}
+
+
+
+@Composable
+fun FullAboutPageScreen(
+    onBack: () -> Unit
+) {
+    BackHandler {
+        onBack()
+    }
+    val uriHandler = androidx.compose.ui.platform.LocalUriHandler.current
+    var isDevExpanded by remember { mutableStateOf(false) }
+
+    BoxWithConstraints(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(MaterialTheme.colorScheme.background)
+    ) {
+        val maxWidth = this.maxWidth
+        val isWideScreen = maxWidth > 600.dp
+        val contentPaddingHorizontal = if (isWideScreen) 32.dp else 18.dp
+
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .verticalScroll(rememberScrollState())
+                .padding(horizontal = contentPaddingHorizontal, vertical = 20.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.spacedBy(16.dp)
+        ) {
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .widthIn(max = 640.dp)
+            ) {
+                Column(
+                    verticalArrangement = Arrangement.spacedBy(16.dp)
+                ) {
+                    // Top Bar Header
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(14.dp)
                     ) {
-                        Icon(
-                            imageVector = Icons.Default.MoreVert,
-                            contentDescription = "More options",
-                            tint = MaterialTheme.colorScheme.onPrimaryContainer
-                        )
+                        IconButton(
+                            onClick = onBack,
+                            modifier = Modifier
+                                .size(42.dp)
+                                .background(MaterialTheme.colorScheme.surfaceVariant, CircleShape)
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.ArrowBack,
+                                contentDescription = "Back",
+                                tint = MaterialTheme.colorScheme.primary,
+                                modifier = Modifier.size(20.dp)
+                            )
+                        }
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text(
+                                text = "About Liveness Shield",
+                                style = MaterialTheme.fontFamilyPairBold(20),
+                                color = MaterialTheme.colorScheme.onSurface
+                            )
+                            Text(
+                                text = "Full application overview, team Sneekers, and developer profile",
+                                style = MaterialTheme.fontFamilyPairMedium(12),
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
                     }
 
-                    DropdownMenu(
-                        expanded = showMoreMenu,
-                        onDismissRequest = { showMoreMenu = false }
+                    // 1. App Identity Card
+                    Card(
+                        modifier = Modifier.fillMaxWidth(),
+                        shape = RoundedCornerShape(20.dp),
+                        colors = CardDefaults.cardColors(
+                            containerColor = MaterialTheme.colorScheme.surface
+                        ),
+                        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f))
                     ) {
-                        DropdownMenuItem(
-                            text = {
-                                Row(
-                                    verticalAlignment = Alignment.CenterVertically,
-                                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                        Column(
+                            modifier = Modifier.padding(20.dp),
+                            verticalArrangement = Arrangement.spacedBy(14.dp)
+                        ) {
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(14.dp)
+                            ) {
+                                Box(
+                                    modifier = Modifier
+                                        .size(48.dp)
+                                        .clip(CircleShape)
+                                        .background(MaterialTheme.colorScheme.primaryContainer),
+                                    contentAlignment = Alignment.Center
                                 ) {
                                     Icon(
-                                        imageVector = Icons.Default.Dns,
+                                        imageVector = Icons.Default.Fingerprint,
                                         contentDescription = null,
-                                        modifier = Modifier.size(18.dp),
-                                        tint = MaterialTheme.colorScheme.primary
+                                        tint = MaterialTheme.colorScheme.primary,
+                                        modifier = Modifier.size(26.dp)
                                     )
-                                    Text("Backend URL Settings")
                                 }
-                            },
-                            onClick = {
-                                showMoreMenu = false
-                                showBackendUrlDialog = true
+                                Column {
+                                    Text(
+                                        text = "Liveness Shield Biometrics",
+                                        style = MaterialTheme.fontFamilyPairBold(16),
+                                        color = MaterialTheme.colorScheme.onSurface
+                                    )
+                                    Text(
+                                        text = "Version ${com.example.BuildConfig.VERSION_NAME} • Production Build",
+                                        style = MaterialTheme.fontFamilyPairMedium(12),
+                                        color = MaterialTheme.colorScheme.primary
+                                    )
+                                }
                             }
-                        )
-                        DropdownMenuItem(
-                            text = {
-                                Row(
-                                    verticalAlignment = Alignment.CenterVertically,
-                                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+
+                            Text(
+                                text = "Liveness Shield is an enterprise-grade mobile identity application delivering real-time anti-spoofing facial verification, secure profile enrollment, and instant identity mapping.",
+                                style = MaterialTheme.fontFamilyPairMedium(12),
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                lineHeight = 18.sp
+                            )
+
+                            HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f))
+
+                            Text(
+                                text = "CORE APP CAPABILITIES",
+                                style = MaterialTheme.fontFamilyPairBold(12),
+                                color = MaterialTheme.colorScheme.primary
+                            )
+
+                            AboutBulletPoint(
+                                title = "Digital Profile Registration",
+                                description = "Streamlined user enrollment paired with instant QR credential generation."
+                            )
+                            AboutBulletPoint(
+                                title = "Live Biometric Scan",
+                                description = "Real-time face verification and blink detection protecting user identity endpoints."
+                            )
+                            AboutBulletPoint(
+                                title = "Modern Compose Experience",
+                                description = "Built with Jetpack Compose following Material 3 design principles with dynamic light and dark theme support."
+                            )
+                        }
+                    }
+
+                    // 2. Team Section
+                    Card(
+                        modifier = Modifier.fillMaxWidth(),
+                        shape = RoundedCornerShape(20.dp),
+                        colors = CardDefaults.cardColors(
+                            containerColor = MaterialTheme.colorScheme.surface
+                        ),
+                        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f))
+                    ) {
+                        Column(
+                            modifier = Modifier.padding(20.dp),
+                            verticalArrangement = Arrangement.spacedBy(14.dp)
+                        ) {
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(14.dp)
+                            ) {
+                                Box(
+                                    modifier = Modifier
+                                        .size(48.dp)
+                                        .clip(CircleShape)
+                                        .background(MaterialTheme.colorScheme.secondaryContainer),
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Default.Groups,
+                                        contentDescription = null,
+                                        tint = MaterialTheme.colorScheme.secondary,
+                                        modifier = Modifier.size(26.dp)
+                                    )
+                                }
+                                Column {
+                                    Text(
+                                        text = "Solution Sneekers",
+                                        style = MaterialTheme.fontFamilyPairBold(16),
+                                        color = MaterialTheme.colorScheme.onSurface
+                                    )
+                                    Text(
+                                        text = "Mobile Engineering & Design Collective",
+                                        style = MaterialTheme.fontFamilyPairMedium(12),
+                                        color = MaterialTheme.colorScheme.secondary
+                                    )
+                                }
+                            }
+
+                            Text(
+                                text = "Solution Sneekers is a software development group dedicated to crafting high-performance, user-centric mobile applications built with native Kotlin and Jetpack Compose.",
+                                style = MaterialTheme.fontFamilyPairMedium(12),
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                lineHeight = 18.sp
+                            )
+
+                            AboutBulletPoint(
+                                title = "User Privacy & Trust",
+                                description = "Architecting applications with data protection and local encryption in mind."
+                            )
+                            AboutBulletPoint(
+                                title = "Design & Usability",
+                                description = "Prioritizing clean visuals, generous spacing, and accessibility across all screen sizes."
+                            )
+
+                            HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f))
+
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .clip(RoundedCornerShape(10.dp))
+                                    .clickable {
+                                        try { uriHandler.openUri("https://solutionsneekers.github.io") } catch (e: Exception) {}
+                                    }
+                                    .padding(vertical = 6.dp),
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(10.dp)
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.Language,
+                                    contentDescription = null,
+                                    tint = MaterialTheme.colorScheme.secondary,
+                                    modifier = Modifier.size(20.dp)
+                                )
+                                Text(
+                                    text = "Lab Web: solutionsneekers.github.io",
+                                    style = MaterialTheme.fontFamilyPairBold(13),
+                                    color = MaterialTheme.colorScheme.secondary
+                                )
+                            }
+                        }
+                    }
+
+                    // 3. Developer Profile Card (SLIGHTLY HIDDEN VIA EXPANDABLE ACCORDION)
+                    Card(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clip(RoundedCornerShape(20.dp))
+                            .clickable { isDevExpanded = !isDevExpanded },
+                        shape = RoundedCornerShape(20.dp),
+                        colors = CardDefaults.cardColors(
+                            containerColor = MaterialTheme.colorScheme.surface
+                        ),
+                        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f))
+                    ) {
+                        Column(
+                            modifier = Modifier.padding(20.dp),
+                            verticalArrangement = Arrangement.spacedBy(12.dp)
+                        ) {
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(14.dp)
+                            ) {
+                                Box(
+                                    modifier = Modifier
+                                        .size(48.dp)
+                                        .clip(CircleShape)
+                                        .background(MaterialTheme.colorScheme.tertiaryContainer),
+                                    contentAlignment = Alignment.Center
                                 ) {
                                     Icon(
                                         imageVector = Icons.Default.Code,
                                         contentDescription = null,
-                                        modifier = Modifier.size(18.dp)
+                                        tint = MaterialTheme.colorScheme.tertiary,
+                                        modifier = Modifier.size(24.dp)
                                     )
-                                    Text("Developer Details")
                                 }
-                            },
-                            onClick = {
-                                showMoreMenu = false
-                                showDeveloperDialog = true
-                            }
-                        )
-                    }
-                }
-            }
-        }
-
-        if (showBackendUrlDialog) {
-            BackendUrlConfigDialog(
-                onDismiss = { showBackendUrlDialog = false }
-            )
-        }
-
-        if (showDeveloperDialog) {
-            val uriHandler = androidx.compose.ui.platform.LocalUriHandler.current
-            AlertDialog(
-                onDismissRequest = { showDeveloperDialog = false },
-                title = {
-                    Text(
-                        text = "Developer Details",
-                        style = MaterialTheme.fontFamilyPairBold(18)
-                    )
-                },
-                text = {
-                    Column(
-                        verticalArrangement = Arrangement.spacedBy(12.dp)
-                    ) {
-                        Text(
-                            text = "Lead Developer: Aaditya",
-                            style = MaterialTheme.fontFamilyPairBold(14),
-                            color = MaterialTheme.colorScheme.onSurface
-                        )
-                        Row(
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(8.dp),
-                            modifier = Modifier.clickable {
-                                try { uriHandler.openUri("https://github.com/AadityaGeek") } catch (e: Exception) {}
-                            }
-                        ) {
-                            Icon(
-                                imageVector = Icons.Default.Code,
-                                contentDescription = "GitHub",
-                                tint = MaterialTheme.colorScheme.primary,
-                                modifier = Modifier.size(18.dp)
-                            )
-                            Text(
-                                text = "GitHub (/AadityaGeek)",
-                                style = MaterialTheme.fontFamilyPairMedium(13),
-                                color = MaterialTheme.colorScheme.primary
-                            )
-                        }
-                        Row(
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(8.dp),
-                            modifier = Modifier.clickable {
-                                try { uriHandler.openUri("https://linkedin.com/in/aadityakr") } catch (e: Exception) {}
-                            }
-                        ) {
-                            Icon(
-                                imageVector = Icons.Default.Work,
-                                contentDescription = "LinkedIn",
-                                tint = MaterialTheme.colorScheme.primary,
-                                modifier = Modifier.size(18.dp)
-                            )
-                            Text(
-                                text = "LinkedIn (/aadityakr)",
-                                style = MaterialTheme.fontFamilyPairMedium(13),
-                                color = MaterialTheme.colorScheme.primary
-                            )
-                        }
-                    }
-                },
-                confirmButton = {
-                    TextButton(onClick = { showDeveloperDialog = false }) {
-                        Text("Close", style = MaterialTheme.fontFamilyPairBold(14))
-                    }
-                }
-            )
-        }
-
-        // Segmented Toggle Tab Row
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .clip(RoundedCornerShape(12.dp))
-                .background(MaterialTheme.colorScheme.surfaceVariant)
-                .padding(4.dp),
-            horizontalArrangement = Arrangement.spacedBy(4.dp)
-        ) {
-            val tabs = listOf("About App", "About Developer")
-            tabs.forEachIndexed { index, title ->
-                val isSelected = aboutTabState == index
-                Box(
-                    modifier = Modifier
-                        .weight(1f)
-                        .clip(RoundedCornerShape(8.dp))
-                        .background(
-                            if (isSelected) MaterialTheme.colorScheme.primary else Color.Transparent
-                        )
-                        .clickable { aboutTabState = index }
-                        .padding(vertical = 12.dp),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Text(
-                        text = title,
-                        style = MaterialTheme.fontFamilyPairBold(14),
-                        color = if (isSelected) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                }
-            }
-        }
-
-        Spacer(modifier = Modifier.height(8.dp))
-
-        if (aboutTabState == 0) {
-            // About App Content
-            Card(
-                modifier = Modifier.fillMaxWidth(),
-                shape = RoundedCornerShape(16.dp),
-                colors = CardDefaults.cardColors(
-                    containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f)
-                ),
-                border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.1f))
-            ) {
-                Column(
-                    modifier = Modifier.padding(20.dp),
-                    verticalArrangement = Arrangement.spacedBy(16.dp)
-                ) {
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Text(
-                            text = "Secure Biometrics. Redefined.",
-                            style = MaterialTheme.fontFamilyPairBold(16),
-                            color = MaterialTheme.colorScheme.primary
-                        )
-                        Surface(
-                            shape = RoundedCornerShape(50.dp),
-                            color = MaterialTheme.colorScheme.primary.copy(alpha = 0.15f),
-                            border = BorderStroke(1.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.3f))
-                        ) {
-                            Text(
-                                text = "v2.0.4",
-                                style = MaterialTheme.fontFamilyPairBold(11),
-                                color = MaterialTheme.colorScheme.primary,
-                                modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp)
-                            )
-                        }
-                    }
-                    Text(
-                        text = "Liveness Shield is an advanced biometric authentication system. It combines secure on-device capture with server-side AI liveness analysis to verify credentials with enterprise-grade privacy and encryption.",
-                        style = MaterialTheme.fontFamilyPairMedium(13),
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        lineHeight = 20.sp
-                    )
-
-                    HorizontalDivider(color = MaterialTheme.colorScheme.outline.copy(alpha = 0.15f), thickness = 1.dp)
-
-                    Row(
-                        horizontalArrangement = Arrangement.spacedBy(12.dp),
-                        verticalAlignment = Alignment.Top
-                    ) {
-                        Icon(
-                            imageVector = Icons.Default.Lock,
-                            contentDescription = null,
-                            tint = MaterialTheme.colorScheme.primary,
-                            modifier = Modifier.size(20.dp).padding(top = 2.dp)
-                        )
-                        Text(
-                            text = "Encrypted & Server Verified: Biometric templates are protected with TLS encryption and validated by secure backend engines.",
-                            style = MaterialTheme.fontFamilyPairMedium(12),
-                            color = MaterialTheme.colorScheme.onSurface,
-                            lineHeight = 18.sp
-                        )
-                    }
-
-                    Row(
-                        horizontalArrangement = Arrangement.spacedBy(12.dp),
-                        verticalAlignment = Alignment.Top
-                    ) {
-                        Icon(
-                            imageVector = Icons.Default.Face,
-                            contentDescription = null,
-                            tint = MaterialTheme.colorScheme.secondary,
-                            modifier = Modifier.size(20.dp).padding(top = 2.dp)
-                        )
-                        Text(
-                            text = "Anti-Spoof Protocol: Leverages frame-by-frame micro-delta algorithms to secure against printed photos, videos, and masks.",
-                            style = MaterialTheme.fontFamilyPairMedium(12),
-                            color = MaterialTheme.colorScheme.onSurface,
-                            lineHeight = 18.sp
-                        )
-                    }
-                }
-            }
-        } else {
-            // About Developer Content
-            Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
-                val uriHandler = androidx.compose.ui.platform.LocalUriHandler.current
-
-                // Team Profile Card (Solution Sneekers)
-                Card(
-                    modifier = Modifier.fillMaxWidth(),
-                    shape = RoundedCornerShape(16.dp),
-                    colors = CardDefaults.cardColors(
-                        containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f)
-                    ),
-                    border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.1f))
-                ) {
-                    Column(
-                        modifier = Modifier.padding(20.dp),
-                        verticalArrangement = Arrangement.spacedBy(16.dp)
-                    ) {
-                        Row(
-                            horizontalArrangement = Arrangement.spacedBy(12.dp),
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Box(
-                                modifier = Modifier
-                                    .size(48.dp)
-                                    .clip(CircleShape)
-                                    .background(MaterialTheme.colorScheme.primary),
-                                contentAlignment = Alignment.Center
-                            ) {
-                                Text(
-                                    text = "SS",
-                                    style = MaterialTheme.fontFamilyPairBold(18),
-                                    color = MaterialTheme.colorScheme.onPrimary
+                                Column(modifier = Modifier.weight(1f)) {
+                                    Text(
+                                        text = "Lead Developer Profile",
+                                        style = MaterialTheme.fontFamilyPairBold(16),
+                                        color = MaterialTheme.colorScheme.onSurface
+                                    )
+                                    Text(
+                                        text = if (isDevExpanded) "Lead Developer Aaditya details" else "Tap to reveal developer credentials & links",
+                                        style = MaterialTheme.fontFamilyPairMedium(12),
+                                        color = MaterialTheme.colorScheme.tertiary
+                                    )
+                                }
+                                Icon(
+                                    imageVector = if (isDevExpanded) Icons.Default.ExpandLess else Icons.Default.ExpandMore,
+                                    contentDescription = "Toggle Developer Profile",
+                                    tint = MaterialTheme.colorScheme.tertiary,
+                                    modifier = Modifier.size(24.dp)
                                 )
                             }
-                            Column {
+
+                            if (isDevExpanded) {
+                                HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f))
+
                                 Text(
-                                    text = "Solution Sneekers",
-                                    style = MaterialTheme.fontFamilyPairBold(16),
+                                    text = "Lead Developer: Aaditya",
+                                    style = MaterialTheme.fontFamilyPairBold(14),
                                     color = MaterialTheme.colorScheme.onSurface
                                 )
+
                                 Text(
-                                    text = "Next-Gen Mobile Solutions & Biometrics Team",
+                                    text = "Aaditya is a mobile software engineer specializing in modern Android architecture, Jetpack Compose UI systems, and biometric identity security.",
                                     style = MaterialTheme.fontFamilyPairMedium(12),
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    lineHeight = 18.sp
                                 )
+
+                                Row(
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.spacedBy(10.dp),
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .clip(RoundedCornerShape(8.dp))
+                                        .clickable {
+                                            try { uriHandler.openUri("https://github.com/AadityaGeek") } catch (e: Exception) {}
+                                        }
+                                        .padding(vertical = 8.dp)
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Default.Code,
+                                        contentDescription = "GitHub",
+                                        tint = MaterialTheme.colorScheme.tertiary,
+                                        modifier = Modifier.size(20.dp)
+                                    )
+                                    Text(
+                                        text = "GitHub: @AadityaGeek",
+                                        style = MaterialTheme.fontFamilyPairBold(13),
+                                        color = MaterialTheme.colorScheme.tertiary
+                                    )
+                                }
+
+                                Row(
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.spacedBy(10.dp),
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .clip(RoundedCornerShape(8.dp))
+                                        .clickable {
+                                            try { uriHandler.openUri("https://linkedin.com/in/aadityakr") } catch (e: Exception) {}
+                                        }
+                                        .padding(vertical = 8.dp)
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Default.Work,
+                                        contentDescription = "LinkedIn",
+                                        tint = MaterialTheme.colorScheme.tertiary,
+                                        modifier = Modifier.size(20.dp)
+                                    )
+                                    Text(
+                                        text = "LinkedIn: linkedin.com/in/aadityakr",
+                                        style = MaterialTheme.fontFamilyPairBold(13),
+                                        color = MaterialTheme.colorScheme.tertiary
+                                    )
+                                }
                             }
                         }
+                    }
 
-                        Text(
-                            text = "We are Solution Sneekers, a passionate team of developers dedicated to creating high-quality, privacy-centric, and exceptionally polished mobile applications. Our expertise spans advanced computer vision, secure biometric cryptography, and intuitive user experiences built natively using Jetpack Compose and Kotlin. Liveness Shield represents our dedication to securing identity endpoints through server-verified passive face liveness algorithms.",
-                            style = MaterialTheme.fontFamilyPairMedium(13),
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            lineHeight = 20.sp
-                        )
-
-                        HorizontalDivider(color = MaterialTheme.colorScheme.outline.copy(alpha = 0.15f), thickness = 1.dp)
-
-                        Row(
-                            horizontalArrangement = Arrangement.SpaceAround,
-                            modifier = Modifier.fillMaxWidth(),
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            DeveloperBadge(
-                                icon = Icons.Default.Code,
-                                label = "GitHub",
-                                onClick = {
-                                    try {
-                                        uriHandler.openUri("https://github.com/SolutionSneekers")
-                                    } catch (e: Exception) {
-                                        // Fallback
-                                    }
-                                }
-                            )
-                            DeveloperBadge(
-                                icon = Icons.Default.Language,
-                                label = "Lab Web",
-                                onClick = {
-                                    try {
-                                        uriHandler.openUri("https://solutionsneekers.github.io")
-                                    } catch (e: Exception) {
-                                        // Fallback
-                                    }
-                                }
-                            )
-                            DeveloperBadge(
-                                icon = Icons.Default.Mail,
-                                label = "Contact",
-                                onClick = {
-                                    try {
-                                        uriHandler.openUri("mailto:solutionsneekers@gmail.com")
-                                    } catch (e: Exception) {
-                                        // Fallback
-                                    }
-                                }
-                            )
-                        }
-
+                    Button(
+                        onClick = onBack,
+                        modifier = Modifier.fillMaxWidth(),
+                        shape = RoundedCornerShape(12.dp)
+                    ) {
+                        Icon(imageVector = Icons.Default.ArrowBack, contentDescription = null)
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text("Back to Services & Utilities", style = MaterialTheme.fontFamilyPairBold(14))
                     }
                 }
             }
         }
+    }
+}
 
-        Spacer(modifier = Modifier.height(16.dp))
-
-        Button(
-            onClick = onBackToHome,
-            modifier = Modifier.fillMaxWidth(),
-            shape = RoundedCornerShape(12.dp)
-        ) {
-            Icon(imageVector = Icons.Default.Home, contentDescription = null)
-            Spacer(modifier = Modifier.width(8.dp))
-            Text("Back to Landing Screen", style = MaterialTheme.fontFamilyPairBold(14))
+@Composable
+private fun AboutBulletPoint(title: String, description: String) {
+    Row(
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+        verticalAlignment = Alignment.Top
+    ) {
+        Box(
+            modifier = Modifier
+                .padding(top = 6.dp)
+                .size(6.dp)
+                .clip(CircleShape)
+                .background(MaterialTheme.colorScheme.primary)
+        )
+        Column {
+            Text(
+                text = title,
+                style = MaterialTheme.fontFamilyPairBold(12),
+                color = MaterialTheme.colorScheme.onSurface
+            )
+            Text(
+                text = description,
+                style = MaterialTheme.fontFamilyPairMedium(11),
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                lineHeight = 16.sp
+            )
         }
     }
 }
@@ -1174,6 +1438,14 @@ fun RegistrationScreen(
 
     val registrationState by viewModel.registrationState.collectAsState()
     val name by viewModel.regName.collectAsState()
+
+    BackHandler(enabled = registrationState !is RegistrationState.Form) {
+        if (registrationState is RegistrationState.PhotoCapture) {
+            viewModel.cancelPhotoCapture()
+        } else {
+            viewModel.resetRegistrationForm()
+        }
+    }
     val age by viewModel.regAge.collectAsState()
     val userId by viewModel.regUserId.collectAsState()
     val regUserIdExists by viewModel.regUserIdExists.collectAsState()
@@ -2079,6 +2351,16 @@ fun VerificationScreen(
     val context = LocalContext.current
     var showScannerDialog by remember { mutableStateOf(false) }
     var showVerificationConfirmDialog by remember { mutableStateOf(false) }
+
+    BackHandler(enabled = showScannerDialog || showVerificationConfirmDialog || verificationState !is VerificationState.Idle) {
+        if (showScannerDialog) {
+            showScannerDialog = false
+        } else if (showVerificationConfirmDialog) {
+            showVerificationConfirmDialog = false
+        } else if (verificationState !is VerificationState.Idle) {
+            viewModel.resetVerification()
+        }
+    }
 
     LaunchedEffect(showScannerDialog, verificationState) {
         if (showScannerDialog || verificationState is VerificationState.FaceCapture) {
