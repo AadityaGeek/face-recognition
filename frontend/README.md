@@ -215,3 +215,65 @@ frontend/
 ├── settings.gradle.kts      # Project settings & repository definitions
 └── README.md                # Project documentation
 ```
+
+---
+
+## 🔄 Verification & Liveness Flow (Detection & Capture)
+
+The face detection, gesture liveness verification, and biometric capture sequence operates as follows:
+
+```
+┌────────────────────┐    1. Camera Frame Stream     ┌───────────────────────┐
+│  CameraX Preview   │ ────────────────────────────> │  ML Kit Face Detector │
+└────────────────────┘                               └───────────────────────┘
+                                                                 │
+                                                                 ▼
+                                                     ┌───────────────────────┐
+                                                     │ Face Framing & Quality│
+                                                     │  Validation (1 Face)  │
+                                                     └───────────────────────┘
+                                                                 │
+                                                                 ▼
+┌────────────────────┐    3. Real-Time Analysis      ┌───────────────────────┐
+│  Gesture Feedback  │ <──────────────────────────── │ MotionLivenessChecker │
+│  (Warning/Alerts)  │                               │ (Blink, Smile, Turns) │
+└────────────────────┘                               └───────────────────────┘
+                                                                 │
+                                                                 │ 4. All Challenges Passed
+                                                                 ▼
+┌────────────────────┐    5. Multipart API Request   ┌───────────────────────┐
+│ Backend Verification│ <──────────────────────────── │ Biometric Capture &   │
+│   (/verify Endpoint)│                              │ High-Res Face Crop    │
+└────────────────────┘                               └───────────────────────┘
+```
+
+### Detailed Sequence Steps:
+
+1. **Live Frame Streaming & ML Kit Analyzer**:
+   - CameraX streams `YUV_420_888` camera frames via `ImageAnalysis` analyzer.
+   - Each frame is converted to an `InputImage` and analyzed in real-time by Google ML Kit Face Detection.
+
+2. **Face Framing & Quality Validation**:
+   - ML Kit evaluates bounding box bounds, face area ratios, eye opening probabilities, smiling probabilities, and head orientation angles (`Euler X` pitch, `Euler Y` yaw).
+   - Validation checks confirm that exactly one face is framed, centered inside the circular UI guide, and sufficiently visible.
+
+3. **Interactive Motion Liveness Challenges**:
+   - The user is presented with a random sequence of 3 liveness challenges (e.g. *Blink Both Eyes*, *Smile*, *Turn Head Left*, *Turn Head Right*, *Nod Head Up*, or *Nod Head Down*).
+   - `MotionLivenessChecker` tracks live landmark metrics against target thresholds:
+     - **Blink**: Both eye opening probabilities drop below `0.40`.
+     - **Smile**: Smiling probability exceeds `0.45` facing forward.
+     - **Head Turn Left**: Yaw exceeds `+12.0°`. (Turning right triggers an incorrect gesture alert).
+     - **Head Turn Right**: Yaw drops below `-12.0°`. (Turning left triggers an incorrect gesture alert).
+     - **Nod Up / Down**: Pitch angle exceeds `+10.0°` (Up) or `-10.0°` (Down).
+   - **Strict Validation & Failure Prevention**:
+     - **15-Second Challenge Timeout**: Each challenge must be completed within 15 seconds, or it triggers an automatic failure.
+     - **Incorrect Gesture Detection**: Performing an incorrect motion (such as turning right when asked to turn left, or tilting head off-center) triggers immediate visual alert feedback. Repeated incorrect gestures (35+ frames) result in challenge failure.
+     - **State-Based Failure Guard**: `LivenessViewModel` enforces that if any challenge fails or times out, the overall verification state is set to `LivenessFailed` with zero score, blocking any transition to `Success`.
+
+4. **Automatic Biometric Capture**:
+   - Upon completing all 3 challenges successfully, `motionLivenessPassed` is set to `true`.
+   - The app automatically triggers a high-resolution frame capture using `ImageCapture`, crops the image to the face bounding rectangle, and converts it into a JPEG bitmap payload.
+
+5. **Remote Backend Verification**:
+   - The cropped portrait bitmap and user metadata are serialized into a `MultipartBody` request.
+   - Retrofit submits the request to the `/verify` endpoint, where deep facial feature comparison takes place and returns the match result, similarity confidence score, and verification log entry.
