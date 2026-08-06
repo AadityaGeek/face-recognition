@@ -25,12 +25,6 @@ interface FaceRecognitionService {
     @GET("/check-user-id")
     suspend fun checkUserId(@Query("user_id") userId: String): Response<ResponseBody>
 
-    @GET("/user/{user_id}")
-    suspend fun getUser(@Path("user_id") userId: String): Response<ResponseBody>
-
-    @GET("/users/{user_id}")
-    suspend fun getUserAlt(@Path("user_id") userId: String): Response<ResponseBody>
-
     @GET("/users")
     suspend fun getAllUsers(): Response<ResponseBody>
 

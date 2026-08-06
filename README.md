@@ -1,6 +1,6 @@
 <div align="center">
 
-  <img src="https://raw.githubusercontent.com/aadityageek/liveness-verify/refs/heads/main/app/src/main/ic_launcher-web.png" width="128" height="128" alt="Liveness Shield Logo" />
+  <img src="https://raw.githubusercontent.com/AadityaGeek/face-recognition/refs/heads/main/app/src/main/ic_launcher-web.png" width="128" height="128" alt="Liveness Shield Logo" />
 
   # 🛡️ Liveness Shield
   ### **Next-Gen Biometric Registration & AI-Powered Liveness Verification**
@@ -9,7 +9,7 @@
 
   <br />
 
-  [![Download APK](https://img.shields.io/badge/Download-Latest%20APK-007ACC?style=for-the-badge&logo=android&logoColor=white)](https://github.com/aadityageek/liveness-verify/releases)
+  [![Download APK](https://img.shields.io/badge/Download-Latest%20APK-007ACC?style=for-the-badge&logo=android&logoColor=white)](https://github.com/AadityaGeek/face-recognition/releases)
   [![Platform](https://img.shields.io/badge/Platform-Android%207.0%2B-green?style=for-the-badge&logo=android)](https://developer.android.com/)
   [![License](https://img.shields.io/badge/License-MIT-orange?style=for-the-badge)](LICENSE)
   [![Developer](https://img.shields.io/badge/Developer-Aaditya-purple?style=for-the-badge&logo=github)](https://github.com/AadityaGeek)
@@ -86,19 +86,19 @@ Whether deployed for KYC onboarding, access control, identity presentation demos
   </tr>
   <tr>
     <td align="center">
-      <img src="https://raw.githubusercontent.com/aadityageek/liveness-verify/refs/heads/main/.github/assets/screenshot_splash.jpg" width="220" alt="Splash Screen" /><br/>
+      <img src="https://raw.githubusercontent.com/AadityaGeek/face-recognition/refs/heads/main/.github/assets/screenshot_splash.jpg" width="220" alt="Splash Screen" /><br/>
       <sub>*Branded initial launch experience.*</sub>
     </td>
     <td align="center">
-      <img src="https://raw.githubusercontent.com/aadityageek/liveness-verify/refs/heads/main/.github/assets/screenshot_landing.jpg" width="220" alt="Landing Page" /><br/>
+      <img src="https://raw.githubusercontent.com/AadityaGeek/face-recognition/refs/heads/main/.github/assets/screenshot_landing.jpg" width="220" alt="Landing Page" /><br/>
       <sub>*Central landing navigation hub.*</sub>
     </td>
     <td align="center">
-      <img src="https://raw.githubusercontent.com/aadityageek/liveness-verify/refs/heads/main/.github/assets/screenshot_register.jpg" width="220" alt="Registration Form" /><br/>
+      <img src="https://raw.githubusercontent.com/AadityaGeek/face-recognition/refs/heads/main/.github/assets/screenshot_register.jpg" width="220" alt="Registration Form" /><br/>
       <sub>*Structured credential input.*</sub>
     </td>
     <td align="center">
-      <img src="https://raw.githubusercontent.com/aadityageek/liveness-verify/refs/heads/main/.github/assets/screenshot_capture.jpg" width="220" alt="Photo Enrollment" /><br/>
+      <img src="https://raw.githubusercontent.com/AadityaGeek/face-recognition/refs/heads/main/.github/assets/screenshot_capture.jpg" width="220" alt="Photo Enrollment" /><br/>
       <sub>*Guided enrollment camera.*</sub>
     </td>
   </tr>
@@ -115,19 +115,19 @@ Whether deployed for KYC onboarding, access control, identity presentation demos
   </tr>
   <tr>
     <td align="center">
-      <img src="https://raw.githubusercontent.com/aadityageek/liveness-verify/refs/heads/main/.github/assets/screenshot_qrpass.jpg" width="220" alt="Generated QR Pass" /><br/>
+      <img src="https://raw.githubusercontent.com/AadityaGeek/face-recognition/refs/heads/main/.github/assets/screenshot_qrpass.jpg" width="220" alt="Generated QR Pass" /><br/>
       <sub>*Shareable QR identity pass.*</sub>
     </td>
     <td align="center">
-      <img src="https://raw.githubusercontent.com/aadityageek/liveness-verify/refs/heads/main/.github/assets/screenshot_qrscan.jpg" width="220" alt="QR Scanner" /><br/>
+      <img src="https://raw.githubusercontent.com/AadityaGeek/face-recognition/refs/heads/main/.github/assets/screenshot_qrscan.jpg" width="220" alt="QR Scanner" /><br/>
       <sub>*High-speed barcode scanner.*</sub>
     </td>
     <td align="center">
-      <img src="https://raw.githubusercontent.com/aadityageek/liveness-verify/refs/heads/main/.github/assets/screenshot_verify.jpg" width="220" alt="Camera Verification" /><br/>
+      <img src="https://raw.githubusercontent.com/AadityaGeek/face-recognition/refs/heads/main/.github/assets/screenshot_verify.jpg" width="220" alt="Camera Verification" /><br/>
       <sub>*Live camera anti-spoofing check.*</sub>
     </td>
     <td align="center">
-      <img src="https://raw.githubusercontent.com/aadityageek/liveness-verify/refs/heads/main/.github/assets/screenshot_result.jpg" width="220" alt="Result Screen" /><br/>
+      <img src="https://raw.githubusercontent.com/AadityaGeek/face-recognition/refs/heads/main/.github/assets/screenshot_result.jpg" width="220" alt="Result Screen" /><br/>
       <sub>*High-confidence match summary.*</sub>
     </td>
   </tr>
@@ -152,7 +152,7 @@ Liveness Shield is engineered with a **Privacy-First & Secure-by-Design** philos
 
 Pre-built standalone **APK binaries** are available directly under the **GitHub Releases** section of this repository.
 
-1. Open the **[GitHub Releases Page](https://github.com/aadityageek/liveness-verify/releases)** on your Android device or computer.
+1. Open the **[GitHub Releases Page](https://github.com/AadityaGeek/face-recognition/releases)** on your Android device or computer.
 2. Download the latest `LivenessShield.apk` file.
 3. Install the APK on your Android device *(Ensure "Install from Unknown Sources" is enabled in system settings if prompted)*.
 4. Launch **Liveness Shield**, grant Camera permissions, and begin exploring the enrollment & verification flows!

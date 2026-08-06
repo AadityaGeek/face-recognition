@@ -217,7 +217,7 @@ class LivenessViewModel(application: Application) : AndroidViewModel(application
         if (cleanId.isEmpty()) return Pair(false, null)
 
         try {
-            // First try FastAPI /check-user-id?user_id=...
+            // Check existence using simple GET /check-user-id?user_id=...
             val checkResp = FaceRecognitionApi.service.checkUserId(cleanId)
             if (checkResp.isSuccessful) {
                 val bodyStr = checkResp.body()?.string() ?: ""
@@ -230,26 +230,8 @@ class LivenessViewModel(application: Application) : AndroidViewModel(application
                     return Pair(false, null)
                 }
                 return Pair(true, name.ifEmpty { null })
-            }
-
-            // Fallback endpoints if /check-user-id is unavailable
-            var response = FaceRecognitionApi.service.getUser(cleanId)
-            if (!response.isSuccessful && response.code() != 404) {
-                response = FaceRecognitionApi.service.getUserAlt(cleanId)
-            }
-
-            if (response.isSuccessful) {
-                val bodyStr = response.body()?.string() ?: ""
-                val json = JSONObject(bodyStr)
-                val exists = json.optBoolean("exists", true)
-                val name = json.optString("name", "").ifEmpty { json.optString("user_name", "") }
-                if (!exists) {
-                    repository.deleteUserById(cleanId)
-                    return Pair(false, null)
-                }
-                return Pair(true, name.ifEmpty { null })
-            } else if (response.code() == 404 || response.code() == 400) {
-                // Server explicitly responded 404 Not Found -> user is deleted or does not exist
+            } else if (checkResp.code() == 404 || checkResp.code() == 400) {
+                // User does not exist on server
                 repository.deleteUserById(cleanId)
                 return Pair(false, null)
             }
