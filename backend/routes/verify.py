@@ -6,7 +6,7 @@ import cv2
 import tempfile, os
 
 router = APIRouter()
-THRESHOLD = 0.6  # 60% similarity threshold
+COSINE_THRESHOLD = 0.40  # Cosine distance threshold for Facenet (distance <= 0.40 corresponds to >= 60% similarity)
 
 def detect_motion(video_path: str) -> tuple[bool, float]:
     """
@@ -85,13 +85,14 @@ async def verify_user(user_id: str = Form(...), file: UploadFile = File(...)):
                 extracted_frame = frame
 
         if extracted_frame is None:
-            return {"verified": False, "error": "Failed to decode image or video frame from upload"}
+            return {"verified": False, "is_live": False, "error": "Failed to decode image or video frame from upload"}
 
         # Run a simple liveness check based on motion across frames.
         is_live, motion_score = detect_motion(tmp_path)
         if not is_live:
             return {
                 "verified": False,
+                "is_live": False,
                 "message": "Liveness check failed. Please use live camera.",
                 "motion_score": round(motion_score, 3)
             }
@@ -99,7 +100,7 @@ async def verify_user(user_id: str = Form(...), file: UploadFile = File(...)):
         # Load the stored reference image for this user from the database.
         user = users_collection.find_one({"user_id": user_id})
         if not user or "image_data" not in user:
-            return {"verified": False, "error": "User not found or no reference image stored"}
+            return {"verified": False, "is_live": True, "error": "User not found or no reference image stored"}
 
         stored_bytes = user["image_data"]
         np_arr_stored = np.frombuffer(stored_bytes, np.uint8)
@@ -107,7 +108,7 @@ async def verify_user(user_id: str = Form(...), file: UploadFile = File(...)):
         stored_img = cv2.imdecode(np_arr_stored, cv2.IMREAD_COLOR)
 
         if stored_img is None:
-            return {"verified": False, "error": "Failed to decode stored user reference image"}
+            return {"verified": False, "is_live": True, "error": "Failed to decode stored user reference image"}
 
         # Compare uploaded face with stored face using DeepFace.
         result = DeepFace.verify(
@@ -120,14 +121,15 @@ async def verify_user(user_id: str = Form(...), file: UploadFile = File(...)):
         )
 
         distance = result.get("distance", 1.0)
-        # Convert distance to percentage similarity.
+        # Convert cosine distance (0.0 = identical, 1.0 = completely different) to similarity percentage.
         similarity = max(0.0, (1.0 - distance)) * 100.0
-        verified = similarity >= (THRESHOLD * 100.0)
+        # Check against standard Facenet cosine distance threshold.
+        verified = distance <= COSINE_THRESHOLD
 
         response = {
             "verified": verified,
             "score_percent": round(similarity, 2),
-            "threshold_percent": THRESHOLD * 100.0,
+            "threshold_percent": round((1.0 - COSINE_THRESHOLD) * 100.0, 2),
             "is_live": True
         }
 
