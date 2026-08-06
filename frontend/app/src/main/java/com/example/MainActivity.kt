@@ -2348,6 +2348,10 @@ fun VerificationScreen(
     val verificationState by viewModel.verificationState.collectAsState()
     val userIdInput by viewModel.verUserIdInput.collectAsState()
     val verUserFoundName by viewModel.verUserFoundName.collectAsState()
+    val motionChallenges by viewModel.motionChallenges.collectAsState()
+    val currentMotionIndex by viewModel.currentMotionIndex.collectAsState()
+    val currentMotionStatus by viewModel.currentMotionStatus.collectAsState()
+    val motionLivenessPassed by viewModel.motionLivenessPassed.collectAsState()
     val context = LocalContext.current
     var showScannerDialog by remember { mutableStateOf(false) }
     var showVerificationConfirmDialog by remember { mutableStateOf(false) }
@@ -2529,13 +2533,13 @@ fun VerificationScreen(
                                 horizontalArrangement = Arrangement.spacedBy(8.dp)
                             ) {
                                 Icon(Icons.Default.Info, contentDescription = null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(16.dp))
-                                Text("Passive Liveness Protocol:", style = MaterialTheme.fontFamilyPairBold(12), color = MaterialTheme.colorScheme.primary)
+                                Text("Interactive Motion Verification Protocol:", style = MaterialTheme.fontFamilyPairBold(12), color = MaterialTheme.colorScheme.primary)
                             }
                              Text(
                                 "1. Scan a registered user's QR Code or enter the User ID above.\n" +
-                                        "2. Tap 'Start Live Passive Capture' below to launch the camera feed.\n" +
-                                        "3. Position face inside oval frame for automatic passive biometric scanning (texture, reflections & Moire pattern detection).\n" +
-                                        "4. Verification and anti-spoofing score will process automatically without needing manual capture taps.",
+                                        "2. Tap 'Proceed to Verification' to review confirmation & launch camera.\n" +
+                                        "3. Complete 3 randomly selected motion challenges.\n" +
+                                        "4. Face biometric verification and anti-spoofing checks will process automatically upon completing all 3 challenges.",
                                 style = MaterialTheme.fontFamilyPairMedium(11),
                                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                                 lineHeight = 16.sp
@@ -2557,7 +2561,7 @@ fun VerificationScreen(
                             },
                             title = {
                                 Text(
-                                    text = "Confirm Identity & Live Capture",
+                                    text = "Confirm Identity & Active Motion Verification",
                                     style = MaterialTheme.fontFamilyPairBold(18),
                                     color = MaterialTheme.colorScheme.onSurface
                                 )
@@ -2596,14 +2600,14 @@ fun VerificationScreen(
 
                                     Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
                                         Text(
-                                            text = "3-Second Live Stream Notice:",
+                                            text = "3-Challenge Motion Protocol Notice:",
                                             style = MaterialTheme.fontFamilyPairBold(12),
                                             color = MaterialTheme.colorScheme.onSurface
                                         )
                                         Text(
-                                            text = "• A 3-second live camera capture will initialize automatically.\n" +
-                                                   "• Keep face centered inside the oval guide frame.\n" +
-                                                   "• Timer counts down from 3s to 0s to auto-capture biometric frame.",
+                                            text = "• Active liveness verification requires completing 3 randomly chosen gesture challenges.\n" +
+                                                   "• Position face centered inside the camera oval guide frame.\n" +
+                                                   "• Follow real-time instructions for each gesture until completed.",
                                             style = MaterialTheme.fontFamilyPairMedium(11),
                                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                                             lineHeight = 16.sp
@@ -2621,7 +2625,7 @@ fun VerificationScreen(
                                 ) {
                                     Icon(imageVector = Icons.Default.Videocam, contentDescription = null, modifier = Modifier.size(18.dp))
                                     Spacer(modifier = Modifier.width(6.dp))
-                                    Text("Confirm & Start 3s Live Capture", style = MaterialTheme.fontFamilyPairBold(13))
+                                    Text("Confirm & Start Motion Verification", style = MaterialTheme.fontFamilyPairBold(13))
                                 }
                             },
                             dismissButton = {
@@ -2700,11 +2704,35 @@ fun VerificationScreen(
                         }
                     }
 
-                    // Active Face Capture Camera (Automatic Passive Capture, No Manual Button Needed)
+                    // Active Face Capture Camera (Automatic Motion & Passive Liveness Verification)
                     CameraView(
                         modifier = Modifier.weight(1f),
                         showCaptureButton = false,
                         isPassiveAutoCapture = true,
+                        motionChallenges = motionChallenges,
+                        currentMotionIndex = currentMotionIndex,
+                        currentMotionStatus = currentMotionStatus,
+                        motionLivenessPassed = motionLivenessPassed,
+                        onMotionChallengeUpdated = { index, status ->
+                            viewModel.updateMotionChallenge(index, status)
+                        },
+                        onMotionAllCompleted = {
+                            viewModel.motionLivenessPassed.value = true
+                        },
+                        onSimulateChallengeSuccess = {
+                            val challenge = motionChallenges.getOrNull(currentMotionIndex)
+                            if (challenge != null) {
+                                viewModel.updateMotionChallenge(
+                                    currentMotionIndex,
+                                    com.example.util.MotionChallengeStatus(
+                                        challenge = challenge,
+                                        isCompleted = true,
+                                        progress = 1.0f,
+                                        feedbackMessage = "${challenge.title} Verified!"
+                                    )
+                                )
+                            }
+                        },
                         onPhotoCaptured = { bitmap ->
                             viewModel.verifyCapturedFace(state.userId, bitmap)
                         }
@@ -3397,6 +3425,7 @@ fun VerificationScreen(
 fun DeveloperConsoleScreen(viewModel: LivenessViewModel) {
     val forceDup by viewModel.forceDuplicateBiometric.collectAsState()
     val forceSpoof by viewModel.forceSpoofingAttack.collectAsState()
+    val forceMotionFail by viewModel.forceMotionFail.collectAsState()
     val forceSimFail by viewModel.forceSimilarityFail.collectAsState()
     val customSimilarity by viewModel.customSimilarityScore.collectAsState()
     val apiLogs by viewModel.apiLogs.collectAsState()
@@ -3501,6 +3530,29 @@ fun DeveloperConsoleScreen(viewModel: LivenessViewModel) {
                                 Switch(
                                     checked = forceSpoof,
                                     onCheckedChange = { viewModel.forceSpoofingAttack.value = it }
+                                )
+                            }
+                        }
+
+                        // Control Card 2b: Motion Liveness Failure
+                        Card(
+                            shape = RoundedCornerShape(16.dp),
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(16.dp),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Column(modifier = Modifier.weight(1f)) {
+                                    Text("Force Motion Gesture Fail", style = MaterialTheme.fontFamilyPairBold(14))
+                                    Text("Simulates active motion liveness verification rejection (gesture inconsistency/timeout).", style = MaterialTheme.fontFamilyPairMedium(11), color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                }
+                                Switch(
+                                    checked = forceMotionFail,
+                                    onCheckedChange = { viewModel.forceMotionFail.value = it }
                                 )
                             }
                         }

@@ -115,6 +115,78 @@ class LivenessViewModel(application: Application) : AndroidViewModel(application
     val forceSpoofingAttack = MutableStateFlow(false)
     val forceSimilarityFail = MutableStateFlow(false)
     val customSimilarityScore = MutableStateFlow(95.0f)
+    val forceMotionFail = MutableStateFlow(false)
+
+    // Active Motion Liveness State (Phase 1)
+    val motionChallenges = MutableStateFlow<List<com.example.util.MotionChallengeType>>(emptyList())
+    val currentMotionIndex = MutableStateFlow(0)
+    val currentMotionStatus = MutableStateFlow<com.example.util.MotionChallengeStatus?>(null)
+    val motionLivenessPassed = MutableStateFlow(false)
+
+    fun generateMotionChallenges() {
+        val available = com.example.util.MotionChallengeType.entries.shuffled()
+        val challenges = available.take(3)
+        motionChallenges.value = challenges
+        currentMotionIndex.value = 0
+        motionLivenessPassed.value = false
+        if (challenges.isNotEmpty()) {
+            currentMotionStatus.value = com.example.util.MotionChallengeStatus(
+                challenge = challenges.first(),
+                isCompleted = false,
+                progress = 0f,
+                feedbackMessage = challenges.first().instruction
+            )
+        }
+    }
+
+    fun updateMotionChallenge(index: Int, status: com.example.util.MotionChallengeStatus) {
+        if (status.isFailed) {
+            motionLivenessPassed.value = false
+            currentMotionStatus.value = status
+            val failMsg = status.errorMessage ?: status.feedbackMessage
+            _verificationState.value = VerificationState.LivenessFailed(
+                userId = verUserIdInput.value,
+                score = 0.0f,
+                threshold = 40.0f,
+                message = failMsg
+            )
+            viewModelScope.launch {
+                repository.insertLog(
+                    VerificationLogEntity(
+                        userId = verUserIdInput.value,
+                        livenessPassed = false,
+                        livenessScore = 0f,
+                        similarityScore = 0f,
+                        isMatched = false,
+                        statusMessage = "Motion Verification Failed: $failMsg"
+                    )
+                )
+            }
+            return
+        }
+        if (status.isCompleted) {
+            val challenges = motionChallenges.value
+            if (index < challenges.size - 1) {
+                val nextIndex = index + 1
+                val nextChallenge = challenges[nextIndex]
+                currentMotionIndex.value = nextIndex
+                currentMotionStatus.value = com.example.util.MotionChallengeStatus(
+                    challenge = nextChallenge,
+                    isCompleted = false,
+                    isFailed = false,
+                    progress = 0f,
+                    feedbackMessage = nextChallenge.instruction
+                )
+            } else {
+                currentMotionIndex.value = index
+                currentMotionStatus.value = status
+                motionLivenessPassed.value = true
+            }
+        } else {
+            currentMotionIndex.value = index
+            currentMotionStatus.value = status
+        }
+    }
 
     // API Logs
     private val _apiLogs = MutableStateFlow<List<ApiLog>>(emptyList())
@@ -504,6 +576,7 @@ class LivenessViewModel(application: Application) : AndroidViewModel(application
             )
             return
         }
+        generateMotionChallenges()
         verUserIdInput.value = cleanUserId
         _verificationState.value = VerificationState.FaceCapture(cleanUserId)
     }
@@ -571,6 +644,53 @@ class LivenessViewModel(application: Application) : AndroidViewModel(application
             multipartBodyBuilder.append("Content-Type: image/jpeg\r\n\r\n")
             multipartBodyBuilder.append("[BINARY IMAGE DATA: Captured Biometric Face Portrait, Dimensions: ${facePhoto.width}x${facePhoto.height}, Quality: 90%]\r\n")
             multipartBodyBuilder.append("--$boundary--\r\n")
+
+            // Mandatory State-Based Validation Check: Prevent success if motion challenges failed, incomplete, or timed out
+            if ((motionChallenges.value.isNotEmpty() && !motionLivenessPassed.value) || forceMotionFail.value) {
+                val motionFailScore = 0.0f
+                val motionFailMsg = if (forceMotionFail.value) {
+                    "Motion Verification Failed: Forced failure via Developer Console."
+                } else if (currentMotionStatus.value?.isFailed == true) {
+                    currentMotionStatus.value?.errorMessage ?: "Motion Verification Failed: Challenge failed validation or timed out."
+                } else {
+                    "Motion Verification Failed: Active motion challenge was not completed or failed validation check."
+                }
+                _verificationState.value = VerificationState.LivenessFailed(
+                    userId = cleanUserId,
+                    score = motionFailScore,
+                    threshold = 40f,
+                    message = motionFailMsg
+                )
+
+                addApiLog(
+                    method = "POST",
+                    endpoint = "/verify (Motion Verification Failed)",
+                    headers = requestHeaders,
+                    reqBody = multipartBodyBuilder.toString(),
+                    statusCode = 403,
+                    respBody = """
+                        {
+                          "success": false,
+                          "verified": false,
+                          "is_live": false,
+                          "motion_liveness": false,
+                          "error": "$motionFailMsg"
+                        }
+                    """.trimIndent()
+                )
+
+                repository.insertLog(
+                    VerificationLogEntity(
+                        userId = cleanUserId,
+                        livenessPassed = false,
+                        livenessScore = motionFailScore,
+                        similarityScore = 0f,
+                        isMatched = false,
+                        statusMessage = motionFailMsg
+                    )
+                )
+                return@launch
+            }
 
             // Check if developer simulator force spoof attack is active
             if (forceSpoofingAttack.value) {

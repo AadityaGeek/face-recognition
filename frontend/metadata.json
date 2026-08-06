@@ -1,6 +1,6 @@
 {
   "name": "Liveness Shield",
-  "description": "An interactive Android app simulating a secure facial recognition and passive liveness verification system with QR codes, 3-second video captures, and Cosine Similarity matching.",
+  "description": "An interactive Android app simulating a secure facial recognition and motion liveness verification system with QR codes, 3 random interactive motion challenges (out of 6 total gestures), and Cosine Similarity matching.",
   "requestFramePermissions": [],
   "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
 }

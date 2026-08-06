@@ -17,8 +17,8 @@ android {
     applicationId = "com.aistudio.livenessverify.vxzpqd"
     minSdk = 24
     targetSdk = 36
-    versionCode = 5
-    versionName = "2.0.4"
+    versionCode = 7
+    versionName = "3.0.5"
 
     testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
   }
@@ -116,6 +116,7 @@ dependencies {
   // implementation(libs.googleid)
   // implementation(libs.firebase.appcheck.recaptcha)
   implementation(libs.google.mlkit.barcode.scanning)
+  implementation(libs.google.mlkit.face.detection)
   implementation(libs.zxing.core)
   implementation(libs.kotlinx.coroutines.android)
   implementation(libs.kotlinx.coroutines.core)

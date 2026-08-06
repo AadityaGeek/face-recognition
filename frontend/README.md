@@ -92,7 +92,7 @@ gradle wrapper --gradle-version 9.3.1
 #### 3. Build Debug APK
 Run the assemble task:
 ```cmd
-gradlew assembleDebug
+.\gradlew assembleDebug
 ```
 Upon completion (`BUILD SUCCESSFUL`), the output APK will be located at:
 ```text
@@ -106,13 +106,13 @@ adb install app\build\outputs\apk\debug\app-debug.apk
 ```
 Alternatively, build and install in a single step using Gradle:
 ```cmd
-gradlew installDebug
+.\gradlew installDebug
 ```
 
 #### 5. Build Release APK (Optional)
 To generate a production release APK:
 ```cmd
-gradlew assembleRelease
+.\gradlew assembleRelease
 ```
 *Note: Release builds require setting environment variables for signing (`KEYSTORE_PATH`, `STORE_PASSWORD`, `KEY_PASSWORD`).*
 

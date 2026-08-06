@@ -83,7 +83,14 @@ fun CameraView(
     recordingProgress: Float = 0f,
     onPhotoCaptured: (Bitmap) -> Unit = {},
     showCaptureButton: Boolean = false,
-    isPassiveAutoCapture: Boolean = false
+    isPassiveAutoCapture: Boolean = false,
+    motionChallenges: List<com.example.util.MotionChallengeType> = emptyList(),
+    currentMotionIndex: Int = 0,
+    currentMotionStatus: com.example.util.MotionChallengeStatus? = null,
+    motionLivenessPassed: Boolean = false,
+    onSimulateChallengeSuccess: () -> Unit = {},
+    onMotionChallengeUpdated: (Int, com.example.util.MotionChallengeStatus) -> Unit = { _, _ -> },
+    onMotionAllCompleted: () -> Unit = {}
 ) {
     val context = LocalContext.current
     var useSimulatedCamera by remember { mutableStateOf(false) }
@@ -109,14 +116,50 @@ fun CameraView(
     // Instantiate ImageCapture for real camera photo taking
     val imageCapture = remember { ImageCapture.Builder().build() }
 
-    // Automatic Passive Liveness Scanner Effect (3-Second Live Capture Timer)
-    LaunchedEffect(isPassiveAutoCapture, capturedBitmap, activeCameraMode) {
-        if (isPassiveAutoCapture && capturedBitmap == null && !isAutoCaptureTriggered) {
+    // Active Motion Detector Instance
+    val motionDetector = remember(motionChallenges) {
+        if (motionChallenges.isNotEmpty()) {
+            com.example.util.MotionLivenessDetector(
+                requiredChallenges = motionChallenges,
+                onChallengeUpdated = { index, status ->
+                    onMotionChallengeUpdated(index, status)
+                },
+                onAllChallengesCompleted = {
+                    onMotionAllCompleted()
+                }
+            )
+        } else null
+    }
+
+    DisposableEffect(motionDetector) {
+        onDispose {
+            motionDetector?.close()
+        }
+    }
+
+    val imageAnalysis = remember(motionDetector) {
+        if (motionDetector != null) {
+            androidx.camera.core.ImageAnalysis.Builder()
+                .setBackpressureStrategy(androidx.camera.core.ImageAnalysis.STRATEGY_KEEP_ONLY_LATEST)
+                .build().apply {
+                    setAnalyzer(ContextCompat.getMainExecutor(context)) { imageProxy ->
+                        motionDetector.processImageProxy(imageProxy)
+                    }
+                }
+        } else null
+    }
+
+    // Automatic Passive / Motion Liveness Scanner Effect
+    val requiresMotionCheck = motionChallenges.isNotEmpty()
+    val canAutoCapture = if (requiresMotionCheck) motionLivenessPassed else true
+
+    LaunchedEffect(isPassiveAutoCapture, capturedBitmap, activeCameraMode, canAutoCapture) {
+        if (isPassiveAutoCapture && capturedBitmap == null && !isAutoCaptureTriggered && canAutoCapture) {
             passiveScanProgress = 0f
             passiveTimerSeconds = 3
-            val totalMillis = 3000L
+            val totalMillis = 1500L // 1.5s snappy capture after motion passed or standard 3s
             val stepInterval = 50L
-            val totalSteps = (totalMillis / stepInterval).toInt() // 60 steps = 3000 ms
+            val totalSteps = (totalMillis / stepInterval).toInt()
             for (step in 1..totalSteps) {
                 delay(stepInterval)
                 passiveScanProgress = step.toFloat() / totalSteps.toFloat()
@@ -235,6 +278,7 @@ fun CameraView(
                 AndroidCameraPreview(
                     modifier = Modifier.fillMaxSize(),
                     imageCapture = imageCapture,
+                    imageAnalysis = imageAnalysis,
                     onPreviewError = {
                         // Fall back to simulation on error
                         useSimulatedCamera = true
@@ -249,118 +293,22 @@ fun CameraView(
                 )
             }
 
-            // Guidelines & Overlays
-            ScannerGuidelinesOverlay(
+            // 1. Face Alignment Skeleton Overlay
+            FaceSkeletonOverlay(
                 modifier = Modifier.fillMaxSize(),
-                isRecording = isRecording,
-                countdownSeconds = countdownSeconds,
-                progress = recordingProgress
+                isRecording = isRecording
             )
 
-            // Floating Camera Mode Toggle (Simulate vs Real)
-            Box(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .align(Alignment.TopEnd)
-                    .padding(16.dp),
-                contentAlignment = Alignment.TopEnd
-            ) {
-                Button(
-                    onClick = { useSimulatedCamera = !useSimulatedCamera },
-                    colors = ButtonDefaults.buttonColors(
-                        containerColor = if (useSimulatedCamera) MaterialTheme.colorScheme.tertiaryContainer else MaterialTheme.colorScheme.primaryContainer,
-                        contentColor = if (useSimulatedCamera) MaterialTheme.colorScheme.onTertiaryContainer else MaterialTheme.colorScheme.onPrimaryContainer
-                    ),
-                    shape = RoundedCornerShape(12.dp),
-                    contentPadding = PaddingValues(horizontal = 12.dp, vertical = 6.dp),
-                    modifier = Modifier.height(36.dp)
-                ) {
-                    Icon(
-                        imageVector = if (useSimulatedCamera) Icons.Default.Cached else Icons.Default.Videocam,
-                        contentDescription = "Toggle Camera",
-                        modifier = Modifier.size(16.dp)
-                    )
-                    if (useSimulatedCamera) {
-                        Spacer(modifier = Modifier.width(6.dp))
-                        Text(
-                            text = "Simulated",
-                            style = MaterialTheme.fontFamilyPairBold(11)
-                        )
-                    }
-                }
-            }
-
-            // Capture Action Overlay (for Registration Screen)
-            if (showCaptureButton && !isRecording) {
-                Box(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .align(Alignment.BottomCenter)
-                        .padding(bottom = 24.dp),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Button(
-                        onClick = {
-                            if (activeCameraMode) {
-                                val executor = ContextCompat.getMainExecutor(context)
-                                imageCapture.takePicture(
-                                    executor,
-                                    object : ImageCapture.OnImageCapturedCallback() {
-                                        override fun onCaptureSuccess(image: ImageProxy) {
-                                            try {
-                                                val decoded = image.toBitmapSafe()
-                                                if (decoded != null) {
-                                                    val rotated = rotateBitmap(decoded, image.imageInfo.rotationDegrees)
-                                                    capturedBitmap = rotated
-                                                } else {
-                                                    capturedBitmap = generateStylizedFaceBitmap()
-                                                }
-                                            } catch (e: Exception) {
-                                                Log.e("CameraView", "Error decoding capture", e)
-                                                capturedBitmap = generateStylizedFaceBitmap()
-                                            } finally {
-                                                image.close()
-                                            }
-                                        }
-
-                                        override fun onError(exception: androidx.camera.core.ImageCaptureException) {
-                                            Log.e("CameraView", "Photo capture failed", exception)
-                                            capturedBitmap = generateStylizedFaceBitmap()
-                                        }
-                                    }
-                                )
-                            } else {
-                                // Generate a high-quality stylized face portrait bitmap for registration
-                                capturedBitmap = generateStylizedFaceBitmap()
-                            }
-                        },
-                        modifier = Modifier
-                            .height(56.dp)
-                            .widthIn(min = 180.dp),
-                        colors = ButtonDefaults.buttonColors(
-                            containerColor = MaterialTheme.colorScheme.primary,
-                            contentColor = MaterialTheme.colorScheme.onPrimary
-                        ),
-                        elevation = ButtonDefaults.buttonElevation(8.dp)
-                    ) {
-                        Icon(
-                            imageVector = Icons.Default.CameraAlt,
-                            contentDescription = "Capture face photo",
-                            modifier = Modifier.size(24.dp)
-                        )
-                        Spacer(modifier = Modifier.width(8.dp))
-                        Text("Capture Face")
-                    }
-                }
-            }
-
-            // Passive Auto-Capture Timer Pill & Progress Banner Overlay
-            if (isPassiveAutoCapture && capturedBitmap == null && !isRecording) {
-                // Top Timer Badge
+            // 2. Consolidated Top Guidance Banner (Single Non-Overlapping Top Pill)
+            if (capturedBitmap == null) {
                 Surface(
                     shape = RoundedCornerShape(20.dp),
                     color = androidx.compose.ui.graphics.Color.Black.copy(alpha = 0.85f),
-                    border = BorderStroke(1.5.dp, MaterialTheme.colorScheme.primary),
+                    border = BorderStroke(
+                        1.5.dp, 
+                        if (motionLivenessPassed) androidx.compose.ui.graphics.Color(0xFF10B981)
+                        else MaterialTheme.colorScheme.primary
+                    ),
                     modifier = Modifier
                         .align(Alignment.TopCenter)
                         .padding(top = 16.dp)
@@ -370,92 +318,179 @@ fun CameraView(
                         verticalAlignment = Alignment.CenterVertically,
                         horizontalArrangement = Arrangement.spacedBy(8.dp)
                     ) {
-                        Icon(
-                            imageVector = Icons.Default.Timer,
-                            contentDescription = null,
-                            tint = MaterialTheme.colorScheme.primary,
-                            modifier = Modifier.size(18.dp)
+                        Box(
+                            modifier = Modifier
+                                .size(8.dp)
+                                .background(
+                                    if (motionLivenessPassed) androidx.compose.ui.graphics.Color(0xFF10B981)
+                                    else MaterialTheme.colorScheme.primary,
+                                    CircleShape
+                                )
                         )
+                        val topText = when {
+                            motionLivenessPassed -> "MOTION VERIFIED — CAPTURING..."
+                            motionChallenges.isNotEmpty() -> "GESTURE LIVENESS CHECK"
+                            isPassiveAutoCapture && passiveTimerSeconds > 0 -> "LIVE CAPTURE: ${passiveTimerSeconds}s"
+                            isPassiveAutoCapture -> "SCANNING SKIN & REFLECTIONS..."
+                            isRecording -> "RECORDING LIVENESS - HOLD STILL"
+                            else -> "ALIGN FACE WITHIN THE OVAL GUIDE"
+                        }
                         Text(
-                            text = if (passiveTimerSeconds > 0) "LIVE CAPTURE: ${passiveTimerSeconds}s" else "SCAN COMPLETE",
-                            style = MaterialTheme.fontFamilyPairBold(13),
+                            text = topText,
+                            style = MaterialTheme.fontFamilyPairBold(12),
                             color = androidx.compose.ui.graphics.Color.White
                         )
                     }
                 }
+            }
 
-                // Center 3-second countdown overlay inside face area
-                if (passiveTimerSeconds > 0) {
-                    Box(
-                        modifier = Modifier.align(Alignment.Center)
+            // 3. Center Countdown Badge (for passive capture post-motion or standard passive)
+            if (isPassiveAutoCapture && capturedBitmap == null && passiveTimerSeconds > 0 && (motionChallenges.isEmpty() || motionLivenessPassed)) {
+                Box(
+                    modifier = Modifier.align(Alignment.Center)
+                ) {
+                    Surface(
+                        shape = CircleShape,
+                        color = androidx.compose.ui.graphics.Color.Black.copy(alpha = 0.65f),
+                        border = BorderStroke(2.dp, MaterialTheme.colorScheme.primary)
                     ) {
-                        Surface(
-                            shape = CircleShape,
-                            color = androidx.compose.ui.graphics.Color.Black.copy(alpha = 0.65f),
-                            border = BorderStroke(2.dp, MaterialTheme.colorScheme.primary)
-                        ) {
-                            Text(
-                                text = "$passiveTimerSeconds",
-                                style = androidx.compose.ui.text.TextStyle(
-                                    fontSize = 42.sp,
-                                    fontWeight = FontWeight.ExtraBold,
-                                    color = MaterialTheme.colorScheme.primary
-                                ),
-                                modifier = Modifier.padding(horizontal = 22.dp, vertical = 10.dp)
-                            )
-                        }
+                        Text(
+                            text = "$passiveTimerSeconds",
+                            style = androidx.compose.ui.text.TextStyle(
+                                fontSize = 42.sp,
+                                fontWeight = FontWeight.ExtraBold,
+                                color = MaterialTheme.colorScheme.primary
+                            ),
+                            modifier = Modifier.padding(horizontal = 22.dp, vertical = 10.dp)
+                        )
                     }
                 }
+            }
 
-                // Bottom Banner Progress
-                Box(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .align(Alignment.BottomCenter)
-                        .padding(20.dp),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Card(
-                        shape = RoundedCornerShape(16.dp),
-                        colors = CardDefaults.cardColors(
-                            containerColor = androidx.compose.ui.graphics.Color.Black.copy(alpha = 0.85f)
-                        ),
-                        border = BorderStroke(1.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.6f))
+            // 4. Bottom Overlay Section (Mutually Exclusive to avoid any overlap)
+            if (capturedBitmap == null) {
+                if (motionChallenges.isNotEmpty()) {
+                    // Active Motion Verification Overlay Card
+                    MotionChallengeOverlay(
+                        modifier = Modifier.fillMaxSize(),
+                        motionChallenges = motionChallenges,
+                        currentMotionIndex = currentMotionIndex,
+                        currentMotionStatus = currentMotionStatus,
+                        motionLivenessPassed = motionLivenessPassed,
+                        onSimulateChallengeSuccess = onSimulateChallengeSuccess
+                    )
+                } else if (showCaptureButton && !isRecording) {
+                    // Registration Manual Capture Button
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .align(Alignment.BottomCenter)
+                            .padding(bottom = 24.dp),
+                        contentAlignment = Alignment.Center
                     ) {
-                        Column(
-                            modifier = Modifier.padding(16.dp),
-                            horizontalAlignment = Alignment.CenterHorizontally,
-                            verticalArrangement = Arrangement.spacedBy(8.dp)
+                        Button(
+                            onClick = {
+                                if (activeCameraMode) {
+                                    val executor = ContextCompat.getMainExecutor(context)
+                                    imageCapture.takePicture(
+                                        executor,
+                                        object : ImageCapture.OnImageCapturedCallback() {
+                                            override fun onCaptureSuccess(image: ImageProxy) {
+                                                try {
+                                                    val decoded = image.toBitmapSafe()
+                                                    if (decoded != null) {
+                                                        val rotated = rotateBitmap(decoded, image.imageInfo.rotationDegrees)
+                                                        capturedBitmap = rotated
+                                                    } else {
+                                                        capturedBitmap = generateStylizedFaceBitmap()
+                                                    }
+                                                } catch (e: Exception) {
+                                                    Log.e("CameraView", "Error decoding capture", e)
+                                                    capturedBitmap = generateStylizedFaceBitmap()
+                                                } finally {
+                                                    image.close()
+                                                }
+                                            }
+
+                                            override fun onError(exception: androidx.camera.core.ImageCaptureException) {
+                                                Log.e("CameraView", "Photo capture failed", exception)
+                                                capturedBitmap = generateStylizedFaceBitmap()
+                                            }
+                                        }
+                                    )
+                                } else {
+                                    capturedBitmap = generateStylizedFaceBitmap()
+                                }
+                            },
+                            modifier = Modifier
+                                .height(56.dp)
+                                .widthIn(min = 180.dp),
+                            colors = ButtonDefaults.buttonColors(
+                                containerColor = MaterialTheme.colorScheme.primary,
+                                contentColor = MaterialTheme.colorScheme.onPrimary
+                            ),
+                            elevation = ButtonDefaults.buttonElevation(8.dp)
                         ) {
-                            Row(
-                                verticalAlignment = Alignment.CenterVertically,
-                                horizontalArrangement = Arrangement.spacedBy(8.dp)
+                            Icon(
+                                imageVector = Icons.Default.CameraAlt,
+                                contentDescription = "Capture face photo",
+                                modifier = Modifier.size(24.dp)
+                            )
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Text("Capture Face")
+                        }
+                    }
+                } else if (isPassiveAutoCapture && !isRecording) {
+                    // Passive Auto-Capture Progress Banner (only when motionChallenges is empty)
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .align(Alignment.BottomCenter)
+                            .padding(20.dp),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Card(
+                            shape = RoundedCornerShape(16.dp),
+                            colors = CardDefaults.cardColors(
+                                containerColor = androidx.compose.ui.graphics.Color.Black.copy(alpha = 0.85f)
+                            ),
+                            border = BorderStroke(1.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.6f))
+                        ) {
+                            Column(
+                                modifier = Modifier.padding(16.dp),
+                                horizontalAlignment = Alignment.CenterHorizontally,
+                                verticalArrangement = Arrangement.spacedBy(8.dp)
                             ) {
-                                Box(
+                                Row(
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                                ) {
+                                    Box(
+                                        modifier = Modifier
+                                            .size(8.dp)
+                                            .background(MaterialTheme.colorScheme.primary, CircleShape)
+                                    )
+                                    Text(
+                                        text = "PASSIVE LIVENESS SCAN (3s TIMER)",
+                                        style = MaterialTheme.fontFamilyPairBold(11),
+                                        color = MaterialTheme.colorScheme.primary
+                                    )
+                                }
+                                LinearProgressIndicator(
+                                    progress = { passiveScanProgress },
+                                    color = MaterialTheme.colorScheme.primary,
+                                    trackColor = androidx.compose.ui.graphics.Color.White.copy(alpha = 0.2f),
                                     modifier = Modifier
-                                        .size(8.dp)
-                                        .background(MaterialTheme.colorScheme.primary, CircleShape)
+                                        .fillMaxWidth()
+                                        .height(6.dp)
+                                        .clip(CircleShape)
                                 )
                                 Text(
-                                    text = "PASSIVE LIVENESS SCAN (3s TIMER)",
-                                    style = MaterialTheme.fontFamilyPairBold(11),
-                                    color = MaterialTheme.colorScheme.primary
+                                    text = if (passiveTimerSeconds > 0) "Keep face centered. Auto-capturing frame in ${passiveTimerSeconds}s..." else "Analyzing skin texture & reflections...",
+                                    style = MaterialTheme.fontFamilyPairMedium(11),
+                                    color = androidx.compose.ui.graphics.Color.White.copy(alpha = 0.9f)
                                 )
                             }
-                            LinearProgressIndicator(
-                                progress = { passiveScanProgress },
-                                color = MaterialTheme.colorScheme.primary,
-                                trackColor = androidx.compose.ui.graphics.Color.White.copy(alpha = 0.2f),
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .height(6.dp)
-                                    .clip(CircleShape)
-                            )
-                            Text(
-                                text = if (passiveTimerSeconds > 0) "Keep face centered. Auto-capturing frame in ${passiveTimerSeconds}s..." else "Analyzing skin texture & reflections...",
-                                style = MaterialTheme.fontFamilyPairMedium(11),
-                                color = androidx.compose.ui.graphics.Color.White.copy(alpha = 0.9f)
-                            )
                         }
                     }
                 }
@@ -468,6 +503,7 @@ fun CameraView(
 fun AndroidCameraPreview(
     modifier: Modifier = Modifier,
     imageCapture: ImageCapture,
+    imageAnalysis: androidx.camera.core.ImageAnalysis? = null,
     onPreviewError: () -> Unit
 ) {
     val context = LocalContext.current
@@ -505,12 +541,23 @@ fun AndroidCameraPreview(
                     }
                     val cameraSelector = CameraSelector.DEFAULT_FRONT_CAMERA
                     cameraProvider.unbindAll()
-                    cameraProvider.bindToLifecycle(
-                        lifecycleOwner,
-                        cameraSelector,
-                        preview,
-                        imageCapture
-                    )
+
+                    if (imageAnalysis != null) {
+                        cameraProvider.bindToLifecycle(
+                            lifecycleOwner,
+                            cameraSelector,
+                            preview,
+                            imageCapture,
+                            imageAnalysis
+                        )
+                    } else {
+                        cameraProvider.bindToLifecycle(
+                            lifecycleOwner,
+                            cameraSelector,
+                            preview,
+                            imageCapture
+                        )
+                    }
                 } catch (e: Exception) {
                     Log.e("CameraPreview", "Camera binding failed", e)
                     onPreviewError()
@@ -1069,4 +1116,133 @@ fun generateStylizedFaceBitmap(): Bitmap {
     canvas.drawOval(cx - 25f, cy - 65f, cx + 25f, cy - 45f, paint)
 
     return bitmap
+}
+
+@Composable
+fun MotionChallengeOverlay(
+    modifier: Modifier = Modifier,
+    motionChallenges: List<com.example.util.MotionChallengeType>,
+    currentMotionIndex: Int,
+    currentMotionStatus: com.example.util.MotionChallengeStatus?,
+    motionLivenessPassed: Boolean,
+    onSimulateChallengeSuccess: () -> Unit
+) {
+    val currentChallenge = motionChallenges.getOrNull(currentMotionIndex)
+
+    Box(
+        modifier = modifier
+            .fillMaxSize()
+            .padding(16.dp),
+        contentAlignment = Alignment.BottomCenter
+    ) {
+        Card(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(bottom = 12.dp),
+            shape = RoundedCornerShape(20.dp),
+            colors = CardDefaults.cardColors(
+                containerColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.92f)
+            ),
+            elevation = CardDefaults.cardElevation(defaultElevation = 8.dp)
+        ) {
+            Column(
+                modifier = Modifier
+                    .padding(16.dp)
+                    .fillMaxWidth(),
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.spacedBy(10.dp)
+            ) {
+                if (motionLivenessPassed) {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Check,
+                            contentDescription = null,
+                            tint = androidx.compose.ui.graphics.Color(0xFF10B981),
+                            modifier = Modifier.size(24.dp)
+                        )
+                        Text(
+                            text = "Motion Verification Passed!",
+                            style = MaterialTheme.fontFamilyPairBold(15),
+                            color = androidx.compose.ui.graphics.Color(0xFF10B981)
+                        )
+                    }
+                    Text(
+                        text = "Capturing biometric face portrait...",
+                        style = MaterialTheme.fontFamilyPairMedium(12),
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                } else if (currentChallenge != null) {
+                    val isWarning = currentMotionStatus?.feedbackMessage?.contains("⚠️") == true || 
+                                    currentMotionStatus?.feedbackMessage?.contains("Incorrect") == true
+                    val isFailed = currentMotionStatus?.isFailed == true || 
+                                   currentMotionStatus?.feedbackMessage?.contains("❌") == true
+                    val statusColor = if (isFailed) MaterialTheme.colorScheme.error 
+                                      else if (isWarning) androidx.compose.ui.graphics.Color(0xFFEF4444) 
+                                      else MaterialTheme.colorScheme.primary
+
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Surface(
+                            color = statusColor.copy(alpha = 0.15f),
+                            shape = RoundedCornerShape(8.dp),
+                            border = BorderStroke(1.dp, statusColor.copy(alpha = 0.4f))
+                        ) {
+                            Text(
+                                text = "STEP ${currentMotionIndex + 1} OF ${motionChallenges.size}",
+                                style = MaterialTheme.fontFamilyPairBold(11),
+                                color = statusColor,
+                                modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp)
+                            )
+                        }
+
+                        Text(
+                            text = if (isWarning || isFailed) "GESTURE VALIDATION ALERT" else "ACTIVE MOTION VERIFICATION",
+                            style = MaterialTheme.fontFamilyPairBold(10),
+                            color = statusColor
+                        )
+                    }
+
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(12.dp),
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Text(
+                            text = if (isFailed) "❌" else if (isWarning) "⚠️" else currentChallenge.iconEmoji,
+                            fontSize = 32.sp
+                        )
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text(
+                                text = currentChallenge.title,
+                                style = MaterialTheme.fontFamilyPairBold(16),
+                                color = MaterialTheme.colorScheme.onSurface
+                            )
+                            Text(
+                                text = currentMotionStatus?.errorMessage ?: currentMotionStatus?.feedbackMessage ?: currentChallenge.instruction,
+                                style = MaterialTheme.fontFamilyPairBold(12),
+                                color = if (isWarning || isFailed) statusColor else MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+                    }
+
+                    val progress = currentMotionStatus?.progress ?: 0f
+                    LinearProgressIndicator(
+                        progress = { progress },
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(6.dp)
+                            .clip(RoundedCornerShape(3.dp)),
+                        color = statusColor,
+                        trackColor = MaterialTheme.colorScheme.surfaceVariant
+                    )
+                }
+            }
+        }
+    }
 }
