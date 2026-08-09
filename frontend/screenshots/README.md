@@ -1,8 +1,7 @@
 # Screenshots Directory
 
-Place your application screenshots here using the following filenames:
+Place your core application screenshot images in this directory using the following file names:
 
-1. `01_registration_screen.png` - User Registration & Face Capture
-2. `02_liveness_challenges.png` - Real-time ML Kit Liveness Detection & Gesture Challenges
-3. `03_qr_scanner.png`           - Built-in QR Code Scanner
-4. `04_verification_result.png`  - Face Match & Biometric Verification Results
+1. `registration.png` — User Registration & Face Framing
+2. `liveness.png`     — Real-Time Liveness Detection & Gesture Challenges
+3. `verification.png` — Face Match & Biometric Verification Result

@@ -71,12 +71,12 @@ Whether deployed for KYC onboarding, access control, identity presentation demos
 
 ---
 
-## 📱 Detailed App Walkthrough & Screenshot Gallery
+## 📱 App Screenshots
 
-| 1. User Registration | 2. Real-Time Liveness (4 Steps) | 3. QR Code Scanner | 4. Verification Result |
-| :---: | :---: | :---: | :---: |
-| <img src="frontend/screenshots/01_registration_screen.png" width="220" alt="Registration Screen" /> | <img src="frontend/screenshots/02_liveness_challenges.png" width="220" alt="Liveness Challenges" /> | <img src="frontend/screenshots/03_qr_scanner.png" width="220" alt="QR Scanner" /> | <img src="frontend/screenshots/04_verification_result.png" width="220" alt="Verification Result" /> |
-| *Profile Setup & Face Framing* | *Gesture & Anti-Spoofing Checks* | *Fast QR Code Pass Reader* | *Biometric Match Result* |
+| 1. User Registration | 2. Liveness Detection | 3. Verification Result |
+| :---: | :---: | :---: |
+| <img src="frontend/screenshots/registration.png" width="240" alt="Registration Screen" /> | <img src="frontend/screenshots/liveness.png" width="240" alt="Liveness Challenges" /> | <img src="frontend/screenshots/verification.png" width="240" alt="Verification Result" /> |
+| *Profile Setup & Face Framing* | *Gesture & Anti-Spoofing Checks* | *Biometric Match Result* |
 
 ---
 
