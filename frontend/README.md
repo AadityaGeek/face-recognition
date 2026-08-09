@@ -8,8 +8,19 @@ A modern Android application built with **Jetpack Compose**, **CameraX**, **ML K
 
 - 📸 **Live Camera Feed & Face Detection**: Real-time face framing and quality checks powered by CameraX and ML Kit.
 - 👁️ **Liveness Detection**: Anti-spoofing checks (blink detection, smile detection, head movement verification).
-- 🔐 **User Registration & Login**: Multi-step registration flow with face capture and remote backend sync.
+- 🧭 **Structured Jetpack Navigation**: Modular navigation routing between Registration, Verification, QR Code Scanner, and Dynamic Settings.
+- 🔐 **User Registration & Biometric Verification**: Multi-step registration flow with face capture, vector matching, and remote backend sync.
+- 📱 **Universal & ABI Split APK Builds**: Flexible Gradle build outputs (universal APK for testing, ABI splits for optimized binary sizes).
 - 🌐 **Dynamic API Base URL**: Easily switch between local development backend and live production servers directly in app settings.
+
+---
+
+## 🖼️ Application Screenshots
+
+| User Registration | Real-Time Liveness (4 Steps) | QR Code Scanner | Verification Result |
+| :---: | :---: | :---: | :---: |
+| ![Registration Screen](screenshots/01_registration_screen.png) | ![Liveness Challenges](screenshots/02_liveness_challenges.png) | ![QR Code Scanner](screenshots/03_qr_scanner.png) | ![Verification Result](screenshots/04_verification_result.png) |
+| *Profile Setup & Face Framing* | *Gesture & Anti-Spoofing Checks* | *Fast QR Code Scan* | *Biometric Match Result* |
 
 ---
 
@@ -17,7 +28,7 @@ A modern Android application built with **Jetpack Compose**, **CameraX**, **ML K
 
 Before building or running the project, ensure you have the following installed:
 
-1. **Java Development Kit (JDK 17 or higher)**
+1. **Java Development Kit (JDK 17 or higher, JDK 23 supported)**
    - Verify installation: `java -version`
    - Ensure the `JAVA_HOME` environment variable points to your JDK directory.
 2. **Android SDK (API Level 24 minimum, target/compile SDK 36)**
@@ -52,13 +63,12 @@ sdk.dir=C\:\\Users\\<Your-Username>\\AppData\\Local\\Android\\Sdk
 *(Adjust the path to match your Android SDK location).*
 
 ### Step 3: Backend Endpoint Setup
-By default, the app is configured in `app/src/main/java/com/example/data/ApiConfig.kt` to connect to the production server:
-`https://backend-url.com/`
+By default, the app is configured in `app/src/main/java/com/example/data/ApiConfig.kt` to connect to the backend server.
 
 For **Local Development**:
-- **Android Emulator**: Use `http://10.0.2.2:5000/` (Android emulator routes `10.0.2.2` to the host machine's `localhost`).
-- **Physical Device (ADB Reverse)**: Connect via USB, run `adb reverse tcp:5000 tcp:5000`, and set URL to `http://localhost:5000/`.
-- **Physical Device (Local Network)**: Use host machine's LAN IP address, e.g., `http://192.168.1.100:5000/`.
+- **Android Emulator**: Use `http://10.0.2.2:8000/` (Android emulator routes `10.0.2.2` to the host machine's `localhost:8000`).
+- **Physical Device (ADB Reverse)**: Connect via USB, run `adb reverse tcp:8000 tcp:8000`, and set URL to `http://localhost:8000/`.
+- **Physical Device (Local Network)**: Use host machine's LAN IP address, e.g., `http://192.168.1.100:8000/`.
 *(Note: You can also update the backend base URL dynamically from within the app settings screen).*
 
 ---
@@ -90,19 +100,21 @@ gradle wrapper --gradle-version 9.3.1
 ```
 
 #### 3. Build Debug APK
-Run the assemble task:
+Clean and build debug APKs:
 ```cmd
-.\gradlew assembleDebug
+.\gradlew clean assembleDebug
 ```
-Upon completion (`BUILD SUCCESSFUL`), the output APK will be located at:
+Upon completion (`BUILD SUCCESSFUL`), the output APKs will be located at:
 ```text
-app\build\outputs\apk\debug\app-debug.apk
+app\build\outputs\apk\debug\app-universal-debug.apk
+app\build\outputs\apk\debug\app-arm64-v8a-debug.apk
+app\build\outputs\apk\debug\app-armeabi-v7a-debug.apk
 ```
 
 #### 4. Install APK onto Connected Device / Emulator
-Ensure your device or emulator is visible (`adb devices`), then install:
+Ensure your device or emulator is visible (`adb devices`), then install the universal APK:
 ```cmd
-adb install app\build\outputs\apk\debug\app-debug.apk
+adb install app\build\outputs\apk\debug\app-universal-debug.apk
 ```
 Alternatively, build and install in a single step using Gradle:
 ```cmd
@@ -115,6 +127,30 @@ To generate a production release APK:
 .\gradlew assembleRelease
 ```
 *Note: Release builds require setting environment variables for signing (`KEYSTORE_PATH`, `STORE_PASSWORD`, `KEY_PASSWORD`).*
+
+---
+
+## 📂 Project Structure Overview
+
+```text
+frontend/
+├── app/
+│   ├── src/main/java/com/example/
+│   │   ├── data/                  # Retrofit API interface, DTOs, and ApiConfig
+│   │   ├── ui/                    # Jetpack Compose UI screens, theme, ViewModels
+│   │   │   ├── components/        # CameraView, QrScannerView, LivenessOverlay
+│   │   │   └── theme/             # App typography, icons, colors
+│   │   ├── MainNavigation.kt      # Navigation Host routing screens
+│   │   ├── RegistrationScreen.kt  # User registration UI & state logic
+│   │   ├── VerificationScreen.kt  # Real-time face verification UI
+│   │   └── MainActivity.kt        # Entry point & runtime camera permission handler
+│   └── build.gradle.kts           # Application build dependencies & ABI split configs
+├── gradle/                        # Gradle wrapper files & dependencies catalog
+├── .env.example                   # Environment variable template
+├── build.gradle.kts               # Root project build file
+├── settings.gradle.kts            # Project settings & repository definitions
+└── README.md                      # Project documentation
+```
 
 ---
 
@@ -138,7 +174,7 @@ Network traffic (HTTP requests/responses) can be inspected using the built-in Ok
 - Search Logcat for `OkHttp` to view request headers, request bodies (Base64 payloads), status codes, and server response times.
 - If requests fail with `java.net.ConnectException` or `Timeout`, verify backend accessibility using `curl`:
   ```cmd
-  curl -I http://10.0.2.2:5000/
+  curl -I http://10.0.2.2:8000/health
   ```
 
 ### 3. Camera & Hardware Debugging
@@ -162,59 +198,11 @@ Network traffic (HTTP requests/responses) can be inspected using the built-in Ok
 
 ### Issue 2: `Keystore file '<project-root>\debug.keystore' not found`
 - **Cause**: Missing custom debug signing key specified in `app/build.gradle.kts`.
-- **Fix**: Update `app/build.gradle.kts` `debug` build type to use standard debug fallback:
-  ```kotlin
-  debug {
-      val debugKeystore = file("${rootDir}/debug.keystore")
-      if (debugKeystore.exists()) {
-          signingConfig = signingConfigs.getByName("debugConfig")
-      } else {
-          signingConfig = signingConfigs.getByName("debug")
-      }
-  }
-  ```
+- **Fix**: Update `app/build.gradle.kts` `debug` build type to use standard debug fallback.
 
-### Issue 3: `Secrets Gradle Plugin error` / `.env file missing`
-- **Cause**: Build requires `.env` property resolution.
-- **Fix**: Duplicate `.env.example` as `.env` in the `frontend` root folder:
-  ```cmd
-  copy .env.example .env
-  ```
-
-### Issue 4: `JAVA_HOME is not set` or `SDK location not found`
-- **Cause**: Environment variables for Java or Android SDK are missing.
-- **Fix**: Set environment variables in your terminal session or globally:
-  ```cmd
-  set JAVA_HOME=C:\Program Files\Java\jdk-17
-  set ANDROID_HOME=C:\Users\<Username>\AppData\Local\Android\Sdk
-  ```
-  Or add `sdk.dir` to `frontend/local.properties`:
-  ```properties
-  sdk.dir=C\:\\Users\\<Username>\\AppData\\Local\\Android\\Sdk
-  ```
-
-### Issue 5: `CLEARTEXT communication to <IP> not permitted`
+### Issue 3: `CLEARTEXT communication to <IP> not permitted`
 - **Cause**: Android 9+ (API 28+) blocks non-HTTPS (HTTP) traffic by default.
-- **Fix**: For local HTTP development (`http://10.0.2.2:5000` or local IP), ensure `android:usesCleartextTraffic="true"` is configured in `app/src/main/AndroidManifest.xml` under `<application>`.
-
----
-
-## 📂 Project Structure Overview
-
-```text
-frontend/
-├── app/
-│   ├── src/main/java/com/example/
-│   │   ├── data/            # API services, Retrofit client, and ApiConfig
-│   │   ├── ui/              # Jetpack Compose UI screens, components, ViewModels
-│   │   └── MainActivity.kt  # Main entry point & permission handlers
-│   └── build.gradle.kts     # Application build dependencies & configs
-├── gradle/                  # Gradle wrapper files & dependencies catalog
-├── .env.example             # Environment variable template
-├── build.gradle.kts         # Root project build file
-├── settings.gradle.kts      # Project settings & repository definitions
-└── README.md                # Project documentation
-```
+- **Fix**: For local HTTP development (`http://10.0.2.2:8000` or local IP), ensure `android:usesCleartextTraffic="true"` is configured in `app/src/main/AndroidManifest.xml` under `<application>`.
 
 ---
 
@@ -222,7 +210,7 @@ frontend/
 
 The face detection, gesture liveness verification, and biometric capture sequence operates as follows:
 
-```
+```text
 ┌────────────────────┐    1. Camera Frame Stream     ┌───────────────────────┐
 │  CameraX Preview   │ ────────────────────────────> │  ML Kit Face Detector │
 └────────────────────┘                               └───────────────────────┘
@@ -239,7 +227,7 @@ The face detection, gesture liveness verification, and biometric capture sequenc
 │  (Warning/Alerts)  │                               │ (Blink, Smile, Turns) │
 └────────────────────┘                               └───────────────────────┘
                                                                  │
-                                                                 │ 4. All Challenges Passed
+                                                                 │ 4. All 4 Challenges Passed
                                                                  ▼
 ┌────────────────────┐    5. Multipart API Request   ┌───────────────────────┐
 │ Backend Verification│ <──────────────────────────── │ Biometric Capture &   │
@@ -258,22 +246,14 @@ The face detection, gesture liveness verification, and biometric capture sequenc
    - Validation checks confirm that exactly one face is framed, centered inside the circular UI guide, and sufficiently visible.
 
 3. **Interactive Motion Liveness Challenges**:
-   - The user is presented with a random sequence of 3 liveness challenges (e.g. *Blink Both Eyes*, *Smile*, *Turn Head Left*, *Turn Head Right*, *Nod Head Up*, or *Nod Head Down*).
+   - The user is presented with a random sequence of **4 liveness challenges** (e.g. *Blink Both Eyes*, *Smile*, *Turn Head Left*, *Turn Head Right*, *Nod Head Up*, or *Nod Head Down*).
    - `MotionLivenessChecker` tracks live landmark metrics against target thresholds:
      - **Blink**: Both eye opening probabilities drop below `0.40`.
      - **Smile**: Smiling probability exceeds `0.45` facing forward.
-     - **Head Turn Left**: Yaw exceeds `+12.0°`. (Turning right triggers an incorrect gesture alert).
-     - **Head Turn Right**: Yaw drops below `-12.0°`. (Turning left triggers an incorrect gesture alert).
+     - **Head Turn Left**: Yaw exceeds `+12.0°`.
+     - **Head Turn Right**: Yaw drops below `-12.0°`.
      - **Nod Up / Down**: Pitch angle exceeds `+10.0°` (Up) or `-10.0°` (Down).
-   - **Strict Validation & Failure Prevention**:
-     - **15-Second Challenge Timeout**: Each challenge must be completed within 15 seconds, or it triggers an automatic failure.
-     - **Incorrect Gesture Detection**: Performing an incorrect motion (such as turning right when asked to turn left, or tilting head off-center) triggers immediate visual alert feedback. Repeated incorrect gestures (35+ frames) result in challenge failure.
-     - **State-Based Failure Guard**: `LivenessViewModel` enforces that if any challenge fails or times out, the overall verification state is set to `LivenessFailed` with zero score, blocking any transition to `Success`.
 
-4. **Automatic Biometric Capture**:
-   - Upon completing all 3 challenges successfully, `motionLivenessPassed` is set to `true`.
-   - The app automatically triggers a high-resolution frame capture using `ImageCapture`, crops the image to the face bounding rectangle, and converts it into a JPEG bitmap payload.
+4. **Automatic Biometric Capture & Remote Verification**:
+   - Upon completing all **4 challenges** successfully, the app captures a high-resolution frame via `ImageCapture`, crops the face region, and submits a `MultipartBody` request to `/verify`.
 
-5. **Remote Backend Verification**:
-   - The cropped portrait bitmap and user metadata are serialized into a `MultipartBody` request.
-   - Retrofit submits the request to the `/verify` endpoint, where deep facial feature comparison takes place and returns the match result, similarity confidence score, and verification log entry.
