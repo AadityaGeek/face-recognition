@@ -16,6 +16,20 @@
 # debugging stack traces.
 #-keepattributes SourceFile,LineNumberTable
 
-# If you keep the line number information, uncomment this to
-# hide the original source file name.
-#-renamesourcefileattribute SourceFile
+# Keep Room entities and DAOs
+-keep class com.example.data.** { *; }
+-keepclassmembers class * extends androidx.room.RoomDatabase {
+    <init>();
+}
+
+# Keep Retrofit & Moshi models
+-keepclassmembers class * {
+    @com.squareup.moshi.* <fields>;
+}
+
+# MLKit Face Detection & Barcode Scanning
+-keep class com.google.mlkit.** { *; }
+-keep class com.google.android.gms.internal.mlkit_** { *; }
+
+# Keep Compose reflection and state classes
+-keep class androidx.compose.** { *; }

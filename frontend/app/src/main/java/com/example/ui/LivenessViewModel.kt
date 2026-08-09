@@ -5,28 +5,27 @@ import android.graphics.Bitmap
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.data.AppDatabase
+import com.example.data.FaceRecognitionApi
 import com.example.data.UserEntity
 import com.example.data.UserRepository
 import com.example.data.VerificationLogEntity
-import com.example.data.FaceRecognitionApi
 import com.example.util.QrCodeGenerator
+import java.util.UUID
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.debounce
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.SharingStarted
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.stateIn
+import kotlinx.coroutines.FlowPreview
+import kotlinx.coroutines.launch
 import okhttp3.MediaType.Companion.toMediaTypeOrNull
 import okhttp3.MultipartBody
 import okhttp3.RequestBody.Companion.asRequestBody
 import okhttp3.RequestBody.Companion.toRequestBody
-import kotlinx.coroutines.FlowPreview
-import kotlinx.coroutines.flow.debounce
-import kotlinx.coroutines.flow.combine
-import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.flow.SharingStarted
-import kotlinx.coroutines.flow.StateFlow
-import kotlinx.coroutines.flow.asStateFlow
-import kotlinx.coroutines.flow.stateIn
-import kotlinx.coroutines.launch
-import java.util.UUID
-
-import kotlinx.coroutines.Dispatchers
 import org.json.JSONObject
 
 // API Request/Response Log Model for high-fidelity simulator console
@@ -125,7 +124,7 @@ class LivenessViewModel(application: Application) : AndroidViewModel(application
 
     fun generateMotionChallenges() {
         val available = com.example.util.MotionChallengeType.entries.shuffled()
-        val challenges = available.take(3)
+        val challenges = available.take(4)
         motionChallenges.value = challenges
         currentMotionIndex.value = 0
         motionLivenessPassed.value = false
@@ -150,18 +149,7 @@ class LivenessViewModel(application: Application) : AndroidViewModel(application
                 threshold = 40.0f,
                 message = failMsg
             )
-            viewModelScope.launch {
-                repository.insertLog(
-                    VerificationLogEntity(
-                        userId = verUserIdInput.value,
-                        livenessPassed = false,
-                        livenessScore = 0f,
-                        similarityScore = 0f,
-                        isMatched = false,
-                        statusMessage = "Motion Verification Failed: $failMsg"
-                    )
-                )
-            }
+            // Zero local database writes; verification state handled in volatile memory
             return
         }
         if (status.isCompleted) {
@@ -225,14 +213,12 @@ class LivenessViewModel(application: Application) : AndroidViewModel(application
                 val exists = json.optBoolean("exists", false)
                 val name = json.optString("name", "").ifEmpty { json.optString("user_name", "") }
                 if (!exists) {
-                    // Server explicitly confirms user does NOT exist -> clean stale local cache
-                    repository.deleteUserById(cleanId)
+                    // Server explicitly confirms user does NOT exist
                     return Pair(false, null)
                 }
                 return Pair(true, name.ifEmpty { null })
             } else if (checkResp.code() == 404 || checkResp.code() == 400) {
                 // User does not exist on server
-                repository.deleteUserById(cleanId)
                 return Pair(false, null)
             }
         } catch (e: Exception) {
@@ -250,6 +236,7 @@ class LivenessViewModel(application: Application) : AndroidViewModel(application
     }
 
     init {
+        generateMotionChallenges()
         viewModelScope.launch(Dispatchers.IO) {
             combine(regUserId, isRegistrationActive) { id, active ->
                 if (!active) null else id.trim()
@@ -486,7 +473,7 @@ class LivenessViewModel(application: Application) : AndroidViewModel(application
                             biometricEmbeddingHex = bioEmbedding
                         )
 
-                        repository.insertUser(userEntity)
+                        // User registered on remote backend; zero data stored on device disk
                         _registrationState.value = RegistrationState.Success(userId, finalQrBase64)
                     }
                 } else {
@@ -661,16 +648,7 @@ class LivenessViewModel(application: Application) : AndroidViewModel(application
                     """.trimIndent()
                 )
 
-                repository.insertLog(
-                    VerificationLogEntity(
-                        userId = cleanUserId,
-                        livenessPassed = false,
-                        livenessScore = motionFailScore,
-                        similarityScore = 0f,
-                        isMatched = false,
-                        statusMessage = motionFailMsg
-                    )
-                )
+                // Zero local disk persistence
                 return@launch
             }
 
@@ -701,21 +679,12 @@ class LivenessViewModel(application: Application) : AndroidViewModel(application
                     """.trimIndent()
                 )
 
-                repository.insertLog(
-                    VerificationLogEntity(
-                        userId = userId,
-                        livenessPassed = false,
-                        livenessScore = spoofScore,
-                        similarityScore = 0f,
-                        isMatched = false,
-                        statusMessage = spoofMsg
-                    )
-                )
+                // Zero local disk persistence
                 return@launch
             }
 
-            // Look up stored profile
-            val storedProfile = repository.getUserById(userId)
+            // No local disk profile lookup
+            val storedProfile: UserEntity? = null
 
             try {
                 val filePart = bitmapToMultipart(facePhoto, "file", "face_capture.jpg")
@@ -875,16 +844,7 @@ class LivenessViewModel(application: Application) : AndroidViewModel(application
                             message = msg
                         )
 
-                        repository.insertLog(
-                            VerificationLogEntity(
-                                userId = userId,
-                                livenessPassed = false,
-                                livenessScore = livenessScore,
-                                similarityScore = 0f,
-                                isMatched = false,
-                                statusMessage = "Liveness check failed. Please use live camera."
-                            )
-                        )
+                        // Verification complete - zero local disk persistence
                     } else {
                         _verificationState.value = VerificationState.MatchResult(
                             userId = returnedUserId,
@@ -895,17 +855,6 @@ class LivenessViewModel(application: Application) : AndroidViewModel(application
                             thresholdPercent = thresholdPercent ?: 60.0f,
                             livenessScore = livenessScore,
                             message = msg
-                        )
-
-                        repository.insertLog(
-                            VerificationLogEntity(
-                                userId = userId,
-                                livenessPassed = true,
-                                livenessScore = livenessScore,
-                                similarityScore = similarityScore,
-                                isMatched = isMatched,
-                                statusMessage = if (isMatched) "Face match approved." else "Biometric mismatch."
-                            )
                         )
                     }
                 } else {
@@ -927,17 +876,6 @@ class LivenessViewModel(application: Application) : AndroidViewModel(application
                         livenessScore = 0f,
                         message = errMsg
                     )
-
-                    repository.insertLog(
-                        VerificationLogEntity(
-                            userId = userId,
-                            livenessPassed = false,
-                            livenessScore = 0f,
-                            similarityScore = 0f,
-                            isMatched = false,
-                            statusMessage = "Server error response: $errMsg"
-                        )
-                    )
                 }
 
             } catch (e: Exception) {
@@ -950,17 +888,6 @@ class LivenessViewModel(application: Application) : AndroidViewModel(application
                     similarityScore = 0f,
                     livenessScore = 0f,
                     message = errMsg
-                )
-
-                repository.insertLog(
-                    VerificationLogEntity(
-                        userId = userId,
-                        livenessPassed = false,
-                        livenessScore = 0f,
-                        similarityScore = 0f,
-                        isMatched = false,
-                        statusMessage = errMsg
-                    )
                 )
             }
         }

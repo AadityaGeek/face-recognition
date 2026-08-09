@@ -1,5 +1,8 @@
 package com.example.data
 
+import com.squareup.moshi.Moshi
+import com.squareup.moshi.kotlin.reflect.KotlinJsonAdapterFactory
+import java.util.concurrent.TimeUnit
 import okhttp3.MultipartBody
 import okhttp3.OkHttpClient
 import okhttp3.RequestBody
@@ -13,9 +16,6 @@ import retrofit2.http.POST
 import retrofit2.http.Part
 import retrofit2.http.Path
 import retrofit2.http.Query
-import java.util.concurrent.TimeUnit
-import com.squareup.moshi.Moshi
-import com.squareup.moshi.kotlin.reflect.KotlinJsonAdapterFactory
 
 interface FaceRecognitionService {
 

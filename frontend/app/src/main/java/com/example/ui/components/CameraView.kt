@@ -7,14 +7,15 @@ import android.graphics.Color
 import android.graphics.Paint
 import android.util.Log
 import androidx.camera.core.CameraSelector
-import androidx.camera.core.Preview
 import androidx.camera.core.ImageCapture
 import androidx.camera.core.ImageProxy
+import androidx.camera.core.Preview
 import androidx.camera.lifecycle.ProcessCameraProvider
 import androidx.camera.view.PreviewView
 import androidx.compose.animation.core.*
-import androidx.compose.foundation.Image
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.*
@@ -36,6 +37,7 @@ import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.nativeCanvas
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalLifecycleOwner
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.viewinterop.AndroidView
@@ -44,9 +46,6 @@ import com.example.ui.theme.*
 import com.google.accompanist.permissions.ExperimentalPermissionsApi
 import com.google.accompanist.permissions.isGranted
 import com.google.accompanist.permissions.rememberPermissionState
-
-import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.foundation.BorderStroke
 import kotlinx.coroutines.delay
 
 // Helper extension to decode ImageProxy to Bitmap
