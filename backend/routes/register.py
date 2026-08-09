@@ -17,12 +17,12 @@ DUPLICATE_THRESHOLD = 0.4  # 40%
 
 
 @router.get("/check-user-id")
-async def check_user_id(user_id: str):
+def check_user_id(user_id: str):
     user = users_collection.find_one({"user_id": user_id}, {"_id": 1})
     return {"exists": user is not None, "user_id": user_id}
 
 @router.post("/register")
-async def register_user(
+def register_user(
     file: UploadFile,
     name: str = Form(...),
     age: int = Form(...),
@@ -32,7 +32,7 @@ async def register_user(
     print(f"\n--- [REGISTER START] user_id: {user_id} ---")
 
     t0 = time.perf_counter()
-    file_bytes = await file.read()
+    file_bytes = file.file.read()
     np_arr = np.frombuffer(file_bytes, np.uint8)
     img = cv2.imdecode(np_arr, cv2.IMREAD_COLOR)
 

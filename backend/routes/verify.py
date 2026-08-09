@@ -65,13 +65,13 @@ def detect_motion(video_path: str) -> tuple[bool, float]:
 
 
 @router.post("/verify")
-async def verify_user(user_id: str = Form(...), file: UploadFile = File(...)):
+def verify_user(user_id: str = Form(...), file: UploadFile = File(...)):
     t_start = time.perf_counter()
     print(f"\n--- [VERIFY START] user_id: {user_id} ---")
     tmp_path = None
     try:
         t0 = time.perf_counter()
-        content = await file.read()
+        content = file.file.read()
 
         extracted_frame = None
         # First, try decoding the upload directly as an in-memory image
