@@ -28,6 +28,18 @@ import okhttp3.RequestBody.Companion.asRequestBody
 import okhttp3.RequestBody.Companion.toRequestBody
 import org.json.JSONObject
 
+// Helper extension function to format strings to Title Case (capitalizing the first letter of each word)
+fun String.toTitleCase(): String {
+    if (this.isBlank()) return this
+    return this.split(" ")
+        .filter { it.isNotEmpty() }
+        .joinToString(" ") { word ->
+            word.lowercase().replaceFirstChar { char ->
+                if (char.isLowerCase()) char.titlecase(java.util.Locale.getDefault()) else char.toString()
+            }
+        }
+}
+
 // API Request/Response Log Model for high-fidelity simulator console
 data class ApiLog(
     val id: String = UUID.randomUUID().toString(),
@@ -216,7 +228,7 @@ class LivenessViewModel(application: Application) : AndroidViewModel(application
                     // Server explicitly confirms user does NOT exist
                     return Pair(false, null)
                 }
-                return Pair(true, name.ifEmpty { null })
+                return Pair(true, if (name.isNotBlank()) name.toTitleCase() else null)
             } else if (checkResp.code() == 404 || checkResp.code() == 400) {
                 // User does not exist on server
                 return Pair(false, null)
@@ -293,7 +305,9 @@ class LivenessViewModel(application: Application) : AndroidViewModel(application
      * Submits user registration data via a Multipart POST request to the remote API.
      */
     fun submitRegistration() {
-        val name = regName.value.trim().replace(Regex("\\s+"), " ")
+        val rawName = regName.value.trim().replace(Regex("\\s+"), " ")
+        val name = rawName.toTitleCase()
+        regName.value = name
         val ageStr = regAge.value.trim()
         val userId = regUserId.value.trim()
         val photo = regCapturedPhoto.value
@@ -787,7 +801,7 @@ class LivenessViewModel(application: Application) : AndroidViewModel(application
 
                     val similarityScore = parsedScore ?: if (isMatched) 95.0f else 25.0f
 
-                    val userName = detailsObj?.optString("name", "")?.ifEmpty { null }
+                    val rawUserName = detailsObj?.optString("name", "")?.ifEmpty { null }
                         ?: json.optString("name", "")
                             .ifEmpty { json.optString("userName", "") }
                             .ifEmpty { json.optString("registered_name", "") }
@@ -796,6 +810,8 @@ class LivenessViewModel(application: Application) : AndroidViewModel(application
                                 userObj?.optString("name", "") ?: ""
                             }
                             .ifEmpty { storedProfile?.name ?: "Verified User" }
+
+                    val userName = rawUserName.toTitleCase()
 
                     val userAge = detailsObj?.optString("age", "")?.ifEmpty { null }
                         ?: json.optString("age", "").ifEmpty { null }

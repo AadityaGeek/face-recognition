@@ -1137,7 +1137,7 @@ fun FullAboutPageScreen(
 
                             AboutBulletPoint(
                                 title = "User Privacy & Trust",
-                                description = "Architecting applications with data protection and local encryption in mind."
+                                description = "Architecting applications with data protection and server-side encryption in mind."
                             )
                             AboutBulletPoint(
                                 title = "Design & Usability",
@@ -1208,12 +1208,12 @@ fun FullAboutPageScreen(
                                 }
                                 Column(modifier = Modifier.weight(1f)) {
                                     Text(
-                                        text = "Lead Developer Profile",
+                                        text = "Developer Profile",
                                         style = MaterialTheme.fontFamilyPairBold(16),
                                         color = MaterialTheme.colorScheme.onSurface
                                     )
                                     Text(
-                                        text = if (isDevExpanded) "Lead Developer Aaditya details" else "Tap to reveal developer credentials & links",
+                                        text = if (isDevExpanded) "Developer Aaditya details" else "Tap to reveal developer credentials & links",
                                         style = MaterialTheme.fontFamilyPairMedium(12),
                                         color = MaterialTheme.colorScheme.tertiary
                                     )
@@ -1230,7 +1230,7 @@ fun FullAboutPageScreen(
                                 HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f))
 
                                 Text(
-                                    text = "Lead Developer: Aaditya",
+                                    text = "Developer: Aaditya",
                                     style = MaterialTheme.fontFamilyPairBold(14),
                                     color = MaterialTheme.colorScheme.onSurface
                                 )
@@ -1432,7 +1432,7 @@ fun DeveloperConsoleScreen(viewModel: LivenessViewModel) {
                 }
             }
             Tab(selected = activeLogTab == 2, onClick = { activeLogTab = 2 }) {
-                Text("Database Info", style = MaterialTheme.fontFamilyPairBold(12), modifier = Modifier.padding(bottom = 12.dp, top = 6.dp))
+                Text("Server & Ledger Info", style = MaterialTheme.fontFamilyPairBold(12), modifier = Modifier.padding(bottom = 12.dp, top = 6.dp))
             }
         }
 
@@ -1578,11 +1578,11 @@ fun DeveloperConsoleScreen(viewModel: LivenessViewModel) {
 
                         Spacer(modifier = Modifier.height(16.dp))
 
-                        // Wipe Database button
+                        // Clear Console Logs button
                         Button(
                             onClick = {
                                 viewModel.clearDbData()
-                                Toast.makeText(context, "Database & Console wiped successfully!", Toast.LENGTH_SHORT).show()
+                                Toast.makeText(context, "API Console logs cleared!", Toast.LENGTH_SHORT).show()
                             },
                             colors = ButtonDefaults.buttonColors(
                                 containerColor = MaterialTheme.colorScheme.error.copy(alpha = 0.15f),
@@ -1595,7 +1595,7 @@ fun DeveloperConsoleScreen(viewModel: LivenessViewModel) {
                         ) {
                             Icon(Icons.Default.DeleteForever, contentDescription = null)
                             Spacer(modifier = Modifier.width(6.dp))
-                            Text("Wipe Local Profiles & Database Logs", style = MaterialTheme.fontFamilyPairBold(13))
+                            Text("Clear API & Console Logs", style = MaterialTheme.fontFamilyPairBold(13))
                         }
 
                         // Hidden Deep Developer Credits Card
@@ -2165,7 +2165,10 @@ fun BackendUrlConfigDialog(
             }
         },
         dismissButton = {
-            TextButton(onClick = onDismiss) {
+            TextButton(
+                onClick = onDismiss,
+                colors = ButtonDefaults.textButtonColors(contentColor = MaterialTheme.colorScheme.onSurfaceVariant)
+            ) {
                 Text("Cancel", style = MaterialTheme.fontFamilyPairMedium(13))
             }
         }

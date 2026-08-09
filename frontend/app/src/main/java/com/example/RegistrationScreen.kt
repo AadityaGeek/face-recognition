@@ -44,6 +44,7 @@ import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.input.KeyboardCapitalization
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
@@ -57,6 +58,8 @@ import com.example.ui.theme.fontFamilyPairMedium
 import com.example.util.QrCodeGenerator
 import java.io.File
 import java.io.FileOutputStream
+import java.text.SimpleDateFormat
+import java.util.Date
 import java.util.Locale
 
 @Composable
@@ -376,6 +379,10 @@ fun RegistrationScreen(
                         label = { Text("Full Name") },
                         placeholder = { Text("e.g. John Doe") },
                         singleLine = true,
+                        keyboardOptions = KeyboardOptions(
+                            capitalization = KeyboardCapitalization.Words,
+                            keyboardType = KeyboardType.Text
+                        ),
                         isError = name.isNotEmpty() && !isNameValid,
                         supportingText = {
                             if (name.isNotEmpty()) {
@@ -889,17 +896,31 @@ fun RegistrationScreen(
                                     }
                                 }
 
-                                Button(
-                                    onClick = { viewModel.startRegistrationPhotoCapture() },
-                                    colors = ButtonDefaults.buttonColors(containerColor = amberColor),
-                                    modifier = Modifier
-                                        .fillMaxWidth()
-                                        .height(48.dp),
-                                    shape = RoundedCornerShape(12.dp)
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    horizontalArrangement = Arrangement.spacedBy(12.dp)
                                 ) {
-                                    Icon(Icons.Default.Refresh, contentDescription = null, modifier = Modifier.size(18.dp))
-                                    Spacer(modifier = Modifier.width(6.dp))
-                                    Text("Retry Connection", style = MaterialTheme.fontFamilyPairBold(13), color = Color.White)
+                                    OutlinedButton(
+                                        onClick = { viewModel.resetRegistrationForm() },
+                                        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.5f)),
+                                        colors = ButtonDefaults.outlinedButtonColors(
+                                            contentColor = MaterialTheme.colorScheme.onSurfaceVariant
+                                        ),
+                                        modifier = Modifier.weight(1f).height(48.dp),
+                                        shape = RoundedCornerShape(12.dp)
+                                    ) {
+                                        Text("Dismiss", style = MaterialTheme.fontFamilyPairBold(13))
+                                    }
+                                    Button(
+                                        onClick = { viewModel.startRegistrationPhotoCapture() },
+                                        colors = ButtonDefaults.buttonColors(containerColor = amberColor),
+                                        modifier = Modifier.weight(1f).height(48.dp),
+                                        shape = RoundedCornerShape(12.dp)
+                                    ) {
+                                        Icon(Icons.Default.Refresh, contentDescription = null, modifier = Modifier.size(18.dp))
+                                        Spacer(modifier = Modifier.width(6.dp))
+                                        Text("Retry Connection", style = MaterialTheme.fontFamilyPairBold(13), color = Color.White)
+                                    }
                                 }
                             }
                         }
@@ -917,6 +938,15 @@ fun RegistrationScreen(
                                 horizontalAlignment = Alignment.CenterHorizontally,
                                 verticalArrangement = Arrangement.spacedBy(16.dp)
                             ) {
+                                Box(modifier = Modifier.fillMaxWidth()) {
+                                    IconButton(
+                                        onClick = { viewModel.resetRegistrationForm() },
+                                        modifier = Modifier.align(Alignment.TopEnd)
+                                    ) {
+                                        Icon(Icons.Default.Close, contentDescription = "Close", tint = MaterialTheme.colorScheme.onSurfaceVariant)
+                                    }
+                                }
+
                                 Box(
                                     modifier = Modifier
                                         .size(72.dp)
@@ -973,17 +1003,38 @@ fun RegistrationScreen(
                                     }
                                 }
 
-                                Button(
-                                    onClick = { viewModel.startRegistrationPhotoCapture() },
-                                    colors = ButtonDefaults.buttonColors(containerColor = redColor),
-                                    modifier = Modifier
-                                        .fillMaxWidth()
-                                        .height(48.dp),
-                                    shape = RoundedCornerShape(12.dp)
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    horizontalArrangement = Arrangement.spacedBy(12.dp)
                                 ) {
-                                    Icon(Icons.Default.Refresh, contentDescription = null, modifier = Modifier.size(18.dp))
-                                    Spacer(modifier = Modifier.width(6.dp))
-                                    Text("Retake Photo", style = MaterialTheme.fontFamilyPairBold(13))
+                                    OutlinedButton(
+                                        onClick = { viewModel.resetRegistrationForm() },
+                                        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.5f)),
+                                        colors = ButtonDefaults.outlinedButtonColors(
+                                            contentColor = MaterialTheme.colorScheme.onSurfaceVariant
+                                        ),
+                                        modifier = Modifier
+                                            .weight(1f)
+                                            .height(48.dp),
+                                        shape = RoundedCornerShape(12.dp)
+                                    ) {
+                                        Icon(Icons.Default.Close, contentDescription = null, modifier = Modifier.size(18.dp))
+                                        Spacer(modifier = Modifier.width(6.dp))
+                                        Text("Cancel", style = MaterialTheme.fontFamilyPairBold(13))
+                                    }
+
+                                    Button(
+                                        onClick = { viewModel.startRegistrationPhotoCapture() },
+                                        colors = ButtonDefaults.buttonColors(containerColor = redColor),
+                                        modifier = Modifier
+                                            .weight(1f)
+                                            .height(48.dp),
+                                        shape = RoundedCornerShape(12.dp)
+                                    ) {
+                                        Icon(Icons.Default.Refresh, contentDescription = null, modifier = Modifier.size(18.dp))
+                                        Spacer(modifier = Modifier.width(6.dp))
+                                        Text("Retake", style = MaterialTheme.fontFamilyPairBold(13))
+                                    }
                                 }
                             }
                         }
@@ -1014,6 +1065,15 @@ fun RegistrationScreen(
                             horizontalAlignment = Alignment.CenterHorizontally,
                             verticalArrangement = Arrangement.spacedBy(16.dp)
                         ) {
+                            Box(modifier = Modifier.fillMaxWidth()) {
+                                IconButton(
+                                    onClick = { viewModel.resetRegistrationForm() },
+                                    modifier = Modifier.align(Alignment.TopEnd)
+                                ) {
+                                    Icon(Icons.Default.Close, contentDescription = "Close", tint = MaterialTheme.colorScheme.onSurfaceVariant)
+                                }
+                            }
+
                             Box(
                                 modifier = Modifier
                                     .size(72.dp)
@@ -1044,7 +1104,7 @@ fun RegistrationScreen(
                             }
 
                             Text(
-                                text = "The biometric embedding was successfully registered! Here is your cryptographic identity QR Code.",
+                                text = "Profile registered successfully! Here is your identity QR Code.",
                                 style = MaterialTheme.fontFamilyPairMedium(13),
                                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                                 textAlign = TextAlign.Center,
@@ -1062,7 +1122,7 @@ fun RegistrationScreen(
                                     modifier = Modifier.size(22.dp)
                                 )
                                 Text(
-                                    text = "CRYPTOGRAPHIC QR CREDENTIAL",
+                                    text = "IDENTITY QR CODE",
                                     style = MaterialTheme.fontFamilyPairBold(12),
                                     color = MaterialTheme.colorScheme.primary
                                 )
@@ -1103,16 +1163,146 @@ fun RegistrationScreen(
                                 }
                             }
 
+                            // DOMINANT USER IDENTITY PROFILE CARD
+                            val nameValue = name.trim()
+                            val ageValue = age.trim()
                             Surface(
-                                shape = RoundedCornerShape(12.dp),
-                                color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)
+                                shape = RoundedCornerShape(16.dp),
+                                color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.3f),
+                                border = BorderStroke(1.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.2f)),
+                                modifier = Modifier.fillMaxWidth()
                             ) {
-                                Text(
-                                    text = "Credentials bound to: ${state.userId}",
-                                    style = MaterialTheme.fontFamilyPairBold(12),
-                                    color = MaterialTheme.colorScheme.onSurface,
-                                    modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp)
-                                )
+                                Column(
+                                    modifier = Modifier.padding(16.dp),
+                                    horizontalAlignment = Alignment.CenterHorizontally,
+                                    verticalArrangement = Arrangement.spacedBy(6.dp)
+                                ) {
+                                    Text(
+                                        text = if (nameValue.isNotEmpty()) nameValue else "Enrolled User",
+                                        style = MaterialTheme.fontFamilyPairBold(20),
+                                        color = MaterialTheme.colorScheme.onSurface,
+                                        textAlign = TextAlign.Center
+                                    )
+
+                                    Row(
+                                        horizontalArrangement = Arrangement.spacedBy(12.dp),
+                                        verticalAlignment = Alignment.CenterVertically
+                                    ) {
+                                        Surface(
+                                            shape = RoundedCornerShape(20.dp),
+                                            color = MaterialTheme.colorScheme.surface,
+                                            border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.2f))
+                                        ) {
+                                            Row(
+                                                modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp),
+                                                verticalAlignment = Alignment.CenterVertically,
+                                                horizontalArrangement = Arrangement.spacedBy(4.dp)
+                                            ) {
+                                                Icon(
+                                                    imageVector = Icons.Default.Badge,
+                                                    contentDescription = null,
+                                                    tint = MaterialTheme.colorScheme.primary,
+                                                    modifier = Modifier.size(14.dp)
+                                                )
+                                                Text(
+                                                    text = "ID: ${state.userId}",
+                                                    style = MaterialTheme.fontFamilyPairBold(12),
+                                                    color = MaterialTheme.colorScheme.onSurface
+                                                )
+                                            }
+                                        }
+
+                                        Surface(
+                                            shape = RoundedCornerShape(20.dp),
+                                            color = MaterialTheme.colorScheme.surface,
+                                            border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.2f))
+                                        ) {
+                                            Row(
+                                                modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp),
+                                                verticalAlignment = Alignment.CenterVertically,
+                                                horizontalArrangement = Arrangement.spacedBy(4.dp)
+                                            ) {
+                                                Icon(
+                                                    imageVector = Icons.Default.Cake,
+                                                    contentDescription = null,
+                                                    tint = MaterialTheme.colorScheme.secondary,
+                                                    modifier = Modifier.size(14.dp)
+                                                )
+                                                Text(
+                                                    text = "Age: ${if (ageValue.isNotEmpty()) ageValue else "N/A"}",
+                                                    style = MaterialTheme.fontFamilyPairBold(12),
+                                                    color = MaterialTheme.colorScheme.onSurface
+                                                )
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+
+                            // Registration Profile Details Breakdown
+                            Card(
+                                shape = RoundedCornerShape(16.dp),
+                                colors = CardDefaults.cardColors(
+                                    containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f)
+                                ),
+                                border = BorderStroke(1.dp, greenColor.copy(alpha = 0.2f)),
+                                modifier = Modifier.fillMaxWidth()
+                            ) {
+                                Column(
+                                    modifier = Modifier.padding(16.dp),
+                                    verticalArrangement = Arrangement.spacedBy(8.dp)
+                                ) {
+                                    Text(
+                                        text = "REGISTRATION RECORD DETAILS",
+                                        style = MaterialTheme.fontFamilyPairBold(11),
+                                        color = greenColor,
+                                        letterSpacing = 0.5.sp
+                                    )
+                                    HorizontalDivider(color = greenColor.copy(alpha = 0.15f))
+
+                                    Row(
+                                        modifier = Modifier.fillMaxWidth(),
+                                        horizontalArrangement = Arrangement.SpaceBetween
+                                    ) {
+                                        Text("User ID", style = MaterialTheme.fontFamilyPairMedium(12), color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                        Text(state.userId, style = MaterialTheme.fontFamilyPairBold(12), color = MaterialTheme.colorScheme.onSurface)
+                                    }
+
+                                    Row(
+                                        modifier = Modifier.fillMaxWidth(),
+                                        horizontalArrangement = Arrangement.SpaceBetween
+                                    ) {
+                                        Text("Full Name", style = MaterialTheme.fontFamilyPairMedium(12), color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                        Text(if (nameValue.isNotEmpty()) nameValue else "N/A", style = MaterialTheme.fontFamilyPairBold(12), color = MaterialTheme.colorScheme.onSurface)
+                                    }
+
+                                    Row(
+                                        modifier = Modifier.fillMaxWidth(),
+                                        horizontalArrangement = Arrangement.SpaceBetween
+                                    ) {
+                                        Text("Age", style = MaterialTheme.fontFamilyPairMedium(12), color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                        Text(if (ageValue.isNotEmpty()) ageValue else "N/A", style = MaterialTheme.fontFamilyPairBold(12), color = MaterialTheme.colorScheme.onSurface)
+                                    }
+
+                                    Row(
+                                        modifier = Modifier.fillMaxWidth(),
+                                        horizontalArrangement = Arrangement.SpaceBetween
+                                    ) {
+                                        Text("Anti-Spoof Check", style = MaterialTheme.fontFamilyPairMedium(12), color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                        Text("PASSED", style = MaterialTheme.fontFamilyPairBold(12), color = greenColor)
+                                    }
+
+                                    Row(
+                                        modifier = Modifier.fillMaxWidth(),
+                                        horizontalArrangement = Arrangement.SpaceBetween
+                                    ) {
+                                        Text("Registered At", style = MaterialTheme.fontFamilyPairMedium(12), color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                        val formattedTime = remember(Unit) {
+                                            SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.getDefault()).format(Date())
+                                        }
+                                        Text(formattedTime, style = MaterialTheme.fontFamilyPairBold(12), color = MaterialTheme.colorScheme.onSurface)
+                                    }
+                                }
                             }
 
                             HorizontalDivider(color = MaterialTheme.colorScheme.outline.copy(alpha = 0.15f))
@@ -1156,10 +1346,24 @@ fun RegistrationScreen(
                                 }
                             }
 
-                            TextButton(
-                                onClick = { viewModel.resetRegistrationForm() }
+                            OutlinedButton(
+                                onClick = { viewModel.resetRegistrationForm() },
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .height(48.dp),
+                                shape = RoundedCornerShape(12.dp),
+                                border = BorderStroke(1.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.5f)),
+                                colors = ButtonDefaults.outlinedButtonColors(
+                                    contentColor = MaterialTheme.colorScheme.primary
+                                )
                             ) {
-                                Text("Register Another Profile", style = MaterialTheme.fontFamilyPairBold(12))
+                                Icon(
+                                    imageVector = Icons.Default.PersonAdd,
+                                    contentDescription = null,
+                                    modifier = Modifier.size(18.dp)
+                                )
+                                Spacer(modifier = Modifier.width(8.dp))
+                                Text("Register Another Profile", style = MaterialTheme.fontFamilyPairBold(13))
                             }
                         }
                     }
@@ -1198,7 +1402,7 @@ fun shareQrCodeImage(context: Context, qrBitmap: Bitmap?, userId: String) {
             type = "image/png"
             putExtra(Intent.EXTRA_STREAM, contentUri)
             putExtra(Intent.EXTRA_SUBJECT, "QR Code Credential for $cleanUserId")
-            putExtra(Intent.EXTRA_TEXT, "Cryptographic Identity QR Code for User ID: $cleanUserId")
+            putExtra(Intent.EXTRA_TEXT, "Identity QR Code for User ID: $cleanUserId")
             addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
         }
 
