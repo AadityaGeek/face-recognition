@@ -19,7 +19,7 @@ FastAPI asynchronous backend service for AI-powered face registration, real-time
 
 ```text
 backend/
-├── main.py              # Application entrypoint, CORS configuration & health check routes
+├── main.py              # Application entrypoint, CORS configuration, startup model warmup & health check routes
 ├── requirements.txt     # Python dependencies
 ├── Dockerfile           # Docker container production configuration
 ├── railway.json         # Railway deployment manifest
@@ -27,9 +27,11 @@ backend/
 │   └── db.py            # MongoDB client connection setup
 ├── models/
 │   └── user.py          # Pydantic schema for User profile data
-└── routes/
-    ├── register.py      # /register & /check-user-id endpoints
-    └── verify.py        # /verify (Liveness & DeepFace match) endpoint
+├── routes/
+│   ├── register.py      # /register & /check-user-id endpoints
+│   └── verify.py        # /verify (Liveness & DeepFace vector match) endpoint
+└── utils/
+    └── image_utils.py   # Frame resizing & vector math helper functions
 ```
 
 ---
@@ -38,51 +40,49 @@ backend/
 
 ### 1. User Registration Flow (`POST /register`)
 
-```
+```text
 [ Upload Image + Form Data ] 
              │
              ▼
-[ Decode Image (OpenCV) ] ──► (Fail? Return "Invalid image")
+[ Decode & Resize Image ] ───► (Fail? Return "Invalid image")
              │
              ▼
 [ DeepFace Embedding ] ─────► Extract 128-d Facenet embedding vector
              │
              ▼
-[ Duplicate Check ] ────────► Cosine similarity against all DB embeddings
+[ Duplicate Check ] ────────► Cosine similarity against stored DB embeddings
                              └─► If similarity ≥ 40% (0.40), reject as duplicate
              │
              ▼
-[ MongoDB Save ] ───────────► Save User profile + Binary image bytes
+[ MongoDB Save ] ───────────► Save User profile + 128-d vector + Binary image bytes
              │
              ▼
 [ QR Code Creation ] ───────► Generate Base64 PNG QR Code containing user_id
 ```
 
 1. **Input Payload**: `file` (Multipart image), `name` (Form string), `age` (Form int), `user_id` (Form string).
-2. **Image Decoding**: Converts raw uploaded bytes into an OpenCV BGR image matrix (`cv2.imdecode`).
-3. **Biometric Embedding**: Computes facial vector embedding using `DeepFace.represent(img, model_name="Facenet", detector_backend="opencv")`.
-4. **Duplicate Prevention**: Iterates existing stored embeddings in MongoDB and computes Cosine Similarity ($\frac{\vec{v_1} \cdot \vec{v_2}}{\|\vec{v_1}\| \|\vec{v_2}\|}$). If similarity $\ge 0.40$, registration is rejected to prevent duplicate profiles.
-5. **Persistence**: Saves profile metadata and binary image payload (`Binary(file_bytes)`) to MongoDB `users` collection.
-6. **QR Generation**: Encodes `user_id` into a PNG QR code, returns it as a Base64 string.
+2. **Image Decoding & Resizing**: Converts uploaded bytes into an OpenCV BGR matrix (`cv2.imdecode`) and resizes (`max_dim=640`) for fast processing.
+3. **Biometric Embedding**: Computes 128-d facial vector embedding using `DeepFace.represent(img, model_name="Facenet", detector_backend="opencv")`.
+4. **Duplicate Prevention**: Queries existing stored vectors in MongoDB using projection (`{"embedding": 1, ...}`) and calculates Cosine Similarity ($\frac{\vec{v_1} \cdot \vec{v_2}}{\|\vec{v_1}\| \|\vec{v_2}\|}$). If similarity $\ge 0.40$, registration is rejected to prevent duplicate profiles.
+5. **Persistence**: Saves profile metadata, embedding vector, and binary image payload (`Binary(file_bytes)`) to MongoDB `users` collection.
+6. **QR Generation**: Encodes `user_id` into a PNG QR code, returned as a Base64 string.
 
 ---
 
 ### 2. Biometric Verification & Liveness Flow (`POST /verify`)
 
-```
+```text
 [ Upload Video/Photo + user_id ]
              │
              ▼
-[ Motion Liveness Check ] ──► Frame-by-frame absdiff (detect_motion)
+[ Motion Liveness Check ] ──► Frame-by-frame absdiff across sub-sampled frames
                              └─► Motion score < 0.5? Return ("is_live": False)
              │
              ▼
-[ Fetch Reference Image ] ──► Retrieve stored BSON image from MongoDB by user_id
+[ Fetch Stored Vector ] ────► Fast MongoDB lookup for pre-computed 128-d embedding
              │
              ▼
-[ DeepFace Verification ] ──► DeepFace.verify(candidate_frame, stored_img)
-                             ├─ Model: Facenet
-                             └─ Metric: Cosine distance (d)
+[ In-Memory Vector Match ] ─► Cosine distance d = 1.0 - cos_sim(v_candidate, v_stored)
              │
              ▼
 [ Threshold Evaluation ] ───► similarity = (1.0 - distance) * 100%
@@ -93,16 +93,26 @@ backend/
 
 1. **Input Payload**: `user_id` (Form string), `file` (Multipart video `.mp4` or photo `.jpg`).
 2. **Motion-Based Liveness Detection**:
-   - `detect_motion()` opens the file via `cv2.VideoCapture`.
+   - `detect_motion()` opens video via `cv2.VideoCapture`.
+   - Sub-samples up to 15 frames downscaled to 320px for high-speed calculation.
    - Computes mean absolute frame difference (`cv2.absdiff`) across consecutive grayscale frames.
-   - If multiple frames are present and peak movement `max_diff < 0.5`, liveness fails (`"is_live": False`). Single frame uploads pass by default to allow fallback photo testing.
-3. **Database Reference Retrieval**: Queries MongoDB `users` collection for `user_id` and decodes `image_data` binary blob into OpenCV image matrix.
-4. **Biometric Distance Calculation**:
-   - Runs `DeepFace.verify()` with `Facenet` model and `cosine` distance metric.
-   - Converts Cosine Distance ($d$) to similarity percentage: `similarity = max(0.0, 1.0 - distance) * 100.0`.
+   - If movement score `max_diff < 0.5`, liveness fails (`"is_live": False`). Single frame photo uploads pass by default.
+3. **Optimized Vector Lookup**: Queries MongoDB `users` collection for `user_id` returning only the pre-computed `embedding` vector (bypassing heavy binary image retrieval).
+4. **Sub-Second Biometric Matching**:
+   - Extracts 128-d vector from uploaded frame via `DeepFace.represent()`.
+   - Computes Cosine Distance ($d$) directly in memory ($d = 1.0 - \frac{\vec{u} \cdot \vec{v}}{\|\vec{u}\| \|\vec{v}\|}$).
+   - Converts Cosine Distance to similarity percentage: `similarity = max(0.0, 1.0 - distance) * 100%`.
 5. **Decision Logic**:
-   - Verified if `distance <= 0.40` (equivalent to $\ge 60\%$ facial similarity threshold).
-   - Returns JSON containing `verified` (boolean), `is_live` (boolean), `score_percent`, `threshold_percent`, and user profile details.
+   - Verified if `distance <= 0.40` ($\ge 60\%$ facial similarity).
+   - Returns JSON with `verified` (boolean), `is_live` (boolean), `score_percent`, `threshold_percent`, and user profile details.
+
+---
+
+## ⚡ Performance Optimizations
+
+* **Startup Model Warmup**: DeepFace model weights are pre-loaded during FastAPI application startup (`@app.on_event("startup")`), eliminating cold-start delays on initial requests.
+* **Vector-Based Lookup**: Avoids stored image binary retrieval by matching against 128-d stored embedding vectors directly.
+* **Smart Downscaling**: Downscales incoming frames to `640px` (and `320px` for motion checks) to maintain high accuracy while minimizing CPU usage.
 
 ---
 
@@ -112,11 +122,10 @@ backend/
 
 * Python 3.11+
 * MongoDB Instance (Local MongoDB or MongoDB Atlas URI)
-* C++ Build tools / OpenCV dependencies (included in slim Docker image)
 
 ---
 
-### Step 1: Clone Repository & Navigate to Backend
+### Step 1: Navigate to Backend Directory
 
 ```bash
 cd backend
@@ -151,6 +160,7 @@ Create a `.env` file in the `backend/` directory:
 
 ```env
 MONGO_URI=mongodb+srv://<username>:<password>@cluster.mongodb.net/
+ALLOWED_ORIGINS=http://localhost:5173,https://your-frontend.vercel.app
 ```
 
 ---
@@ -166,6 +176,7 @@ uvicorn main:app --reload --host 0.0.0.0 --port 8000
 The API will be available at:
 * **Interactive Docs (Swagger UI)**: `http://localhost:8000/docs`
 * **Health Check**: `http://localhost:8000/health`
+* **User ID Check**: `http://localhost:8000/check-user-id?user_id=123`
 
 ---
 
