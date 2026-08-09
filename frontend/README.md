@@ -15,15 +15,6 @@ A modern Android application built with **Jetpack Compose**, **CameraX**, **ML K
 
 ---
 
-## 🖼️ Application Screenshots
-
-| User Registration | Real-Time Liveness (4 Steps) | QR Code Scanner | Verification Result |
-| :---: | :---: | :---: | :---: |
-| ![Registration Screen](screenshots/01_registration_screen.png) | ![Liveness Challenges](screenshots/02_liveness_challenges.png) | ![QR Code Scanner](screenshots/03_qr_scanner.png) | ![Verification Result](screenshots/04_verification_result.png) |
-| *Profile Setup & Face Framing* | *Gesture & Anti-Spoofing Checks* | *Fast QR Code Scan* | *Biometric Match Result* |
-
----
-
 ## 🛠 Prerequisites
 
 Before building or running the project, ensure you have the following installed:

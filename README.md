@@ -73,65 +73,10 @@ Whether deployed for KYC onboarding, access control, identity presentation demos
 
 ## 📱 Detailed App Walkthrough & Screenshot Gallery
 
-> Below is a structured visual presentation of the Liveness Shield user experience. *(Replace image placeholder URLs with hosted screenshot assets).*
-
-### Phase 1: Onboarding & Identity Enrollment
-
-<table>
-  <tr>
-    <td align="center" width="25%"><b>1. Branded Splash</b></td>
-    <td align="center" width="25%"><b>2. Identity Hub</b></td>
-    <td align="center" width="25%"><b>3. Registration Form</b></td>
-    <td align="center" width="25%"><b>4. Photo Capture</b></td>
-  </tr>
-  <tr>
-    <td align="center">
-      <img src="https://raw.githubusercontent.com/AadityaGeek/face-recognition/refs/heads/main/.github/assets/screenshot_splash.jpg" width="220" alt="Splash Screen" /><br/>
-      <sub>*Branded initial launch experience.*</sub>
-    </td>
-    <td align="center">
-      <img src="https://raw.githubusercontent.com/AadityaGeek/face-recognition/refs/heads/main/.github/assets/screenshot_landing.jpg" width="220" alt="Landing Page" /><br/>
-      <sub>*Central landing navigation hub.*</sub>
-    </td>
-    <td align="center">
-      <img src="https://raw.githubusercontent.com/AadityaGeek/face-recognition/refs/heads/main/.github/assets/screenshot_register.jpg" width="220" alt="Registration Form" /><br/>
-      <sub>*Structured credential input.*</sub>
-    </td>
-    <td align="center">
-      <img src="https://raw.githubusercontent.com/AadityaGeek/face-recognition/refs/heads/main/.github/assets/screenshot_capture.jpg" width="220" alt="Photo Enrollment" /><br/>
-      <sub>*Guided enrollment camera.*</sub>
-    </td>
-  </tr>
-</table>
-
-### Phase 2: QR Pass, Scanning & Live Verification
-
-<table>
-  <tr>
-    <td align="center" width="25%"><b>5. Digital QR Pass</b></td>
-    <td align="center" width="25%"><b>6. QR Scanner</b></td>
-    <td align="center" width="25%"><b>7. Live Face Check</b></td>
-    <td align="center" width="25%"><b>8. Verification Result</b></td>
-  </tr>
-  <tr>
-    <td align="center">
-      <img src="https://raw.githubusercontent.com/AadityaGeek/face-recognition/refs/heads/main/.github/assets/screenshot_qrpass.jpg" width="220" alt="Generated QR Pass" /><br/>
-      <sub>*Shareable QR identity pass.*</sub>
-    </td>
-    <td align="center">
-      <img src="https://raw.githubusercontent.com/AadityaGeek/face-recognition/refs/heads/main/.github/assets/screenshot_qrscan.jpg" width="220" alt="QR Scanner" /><br/>
-      <sub>*High-speed barcode scanner.*</sub>
-    </td>
-    <td align="center">
-      <img src="https://raw.githubusercontent.com/AadityaGeek/face-recognition/refs/heads/main/.github/assets/screenshot_verify.jpg" width="220" alt="Camera Verification" /><br/>
-      <sub>*Live camera anti-spoofing check.*</sub>
-    </td>
-    <td align="center">
-      <img src="https://raw.githubusercontent.com/AadityaGeek/face-recognition/refs/heads/main/.github/assets/screenshot_result.jpg" width="220" alt="Result Screen" /><br/>
-      <sub>*High-confidence match summary.*</sub>
-    </td>
-  </tr>
-</table>
+| 1. User Registration | 2. Real-Time Liveness (4 Steps) | 3. QR Code Scanner | 4. Verification Result |
+| :---: | :---: | :---: | :---: |
+| <img src="frontend/screenshots/01_registration_screen.png" width="220" alt="Registration Screen" /> | <img src="frontend/screenshots/02_liveness_challenges.png" width="220" alt="Liveness Challenges" /> | <img src="frontend/screenshots/03_qr_scanner.png" width="220" alt="QR Scanner" /> | <img src="frontend/screenshots/04_verification_result.png" width="220" alt="Verification Result" /> |
+| *Profile Setup & Face Framing* | *Gesture & Anti-Spoofing Checks* | *Fast QR Code Pass Reader* | *Biometric Match Result* |
 
 ---
 
