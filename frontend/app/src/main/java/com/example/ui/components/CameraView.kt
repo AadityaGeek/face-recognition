@@ -118,7 +118,10 @@ fun CameraView(
                 onChallengeUpdated = { index, status ->
                     onMotionChallengeUpdated(index, status)
                 },
-                onAllChallengesCompleted = {
+                onAllChallengesCompleted = { bestFrame ->
+                    if (bestFrame != null) {
+                        onPhotoCaptured(bestFrame)
+                    }
                     onMotionAllCompleted()
                 }
             )

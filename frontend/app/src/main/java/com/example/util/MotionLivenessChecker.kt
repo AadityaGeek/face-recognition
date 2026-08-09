@@ -45,12 +45,13 @@ data class MotionLivenessResult(
 class MotionLivenessDetector(
     private val requiredChallenges: List<MotionChallengeType>,
     private val onChallengeUpdated: (currentChallengeIndex: Int, status: MotionChallengeStatus) -> Unit,
-    private val onAllChallengesCompleted: () -> Unit
+    private val onAllChallengesCompleted: (bestCapturedFrame: Bitmap?) -> Unit
 ) {
     private val options = FaceDetectorOptions.Builder()
         .setPerformanceMode(FaceDetectorOptions.PERFORMANCE_MODE_FAST)
         .setLandmarkMode(FaceDetectorOptions.LANDMARK_MODE_ALL)
         .setClassificationMode(FaceDetectorOptions.CLASSIFICATION_MODE_ALL)
+        .enableTracking()
         .build()
 
     private val detector = FaceDetection.getClient(options)
@@ -61,7 +62,13 @@ class MotionLivenessDetector(
     private var challengeStartTimeMs = System.currentTimeMillis()
     private var incorrectGestureFrameCount = 0
 
+    private var initialTrackingId: Int? = null
+    private var bestFrameBitmap: Bitmap? = null
+    private var bestFrameScore: Float = -1.0f
+
     private val CHALLENGE_TIMEOUT_MS = 15000L // 15 seconds per challenge
+
+    fun getBestCapturedFrame(): Bitmap? = bestFrameBitmap
 
     fun reset() {
         currentChallengeIndex = 0
@@ -69,10 +76,19 @@ class MotionLivenessDetector(
         isProcessingFrame = false
         challengeStartTimeMs = System.currentTimeMillis()
         incorrectGestureFrameCount = 0
+        initialTrackingId = null
+        bestFrameBitmap = null
+        bestFrameScore = -1.0f
     }
 
     fun getCurrentChallenge(): MotionChallengeType? {
         return requiredChallenges.getOrNull(currentChallengeIndex)
+    }
+
+    private fun rotateBitmapHelper(bitmap: Bitmap, degrees: Int): Bitmap {
+        if (degrees == 0) return bitmap
+        val matrix = android.graphics.Matrix().apply { postRotate(degrees.toFloat()) }
+        return Bitmap.createBitmap(bitmap, 0, 0, bitmap.width, bitmap.height, matrix, true)
     }
 
     @OptIn(ExperimentalGetImage::class)
@@ -84,13 +100,16 @@ class MotionLivenessDetector(
         }
 
         isProcessingFrame = true
-        val inputImage = InputImage.fromMediaImage(mediaImage, imageProxy.imageInfo.rotationDegrees)
+        val rotationDegrees = imageProxy.imageInfo.rotationDegrees
+        val inputImage = InputImage.fromMediaImage(mediaImage, rotationDegrees)
 
         detector.process(inputImage)
             .addOnSuccessListener { faces ->
-                if (faces.isNotEmpty()) {
+                if (faces.size > 1) {
+                    failCurrentChallenge("Multiple faces detected in frame. Only one person is allowed during verification.")
+                } else if (faces.isNotEmpty()) {
                     val face = faces.first()
-                    evaluateFaceForChallenge(face)
+                    evaluateFaceForChallenge(face, imageProxy, rotationDegrees)
                 } else {
                     checkTimeout()
                 }
@@ -107,9 +126,11 @@ class MotionLivenessDetector(
         val inputImage = InputImage.fromBitmap(bitmap, 0)
         detector.process(inputImage)
             .addOnSuccessListener { faces ->
-                if (faces.isNotEmpty()) {
+                if (faces.size > 1) {
+                    failCurrentChallenge("Multiple faces detected in frame. Only one person is allowed during verification.")
+                } else if (faces.isNotEmpty()) {
                     val face = faces.first()
-                    evaluateFaceForChallenge(face)
+                    evaluateFaceForChallenge(face, sourceBitmap = bitmap)
                 } else {
                     checkTimeout()
                 }
@@ -161,12 +182,56 @@ class MotionLivenessDetector(
         incorrectGestureFrameCount = 0
 
         if (currentChallengeIndex >= requiredChallenges.size) {
-            onAllChallengesCompleted()
+            onAllChallengesCompleted(getBestCapturedFrame())
         }
     }
 
-    private fun evaluateFaceForChallenge(face: Face) {
+    private fun evaluateFaceForChallenge(
+        face: Face,
+        imageProxy: ImageProxy? = null,
+        rotationDegrees: Int = 0,
+        sourceBitmap: Bitmap? = null
+    ) {
         val challenge = getCurrentChallenge() ?: return
+
+        // 1. Enforce Face Identity Continuity
+        val currentTrackingId = face.trackingId
+        if (currentTrackingId != null) {
+            if (initialTrackingId == null) {
+                initialTrackingId = currentTrackingId
+            } else if (currentTrackingId != initialTrackingId) {
+                failCurrentChallenge("Face Identity Swapped: A different person entered the camera view during verification.")
+                return
+            }
+        }
+
+        // 2. Best Frame Selection Buffer Scoring
+        val yaw = abs(face.headEulerAngleY)
+        val pitch = abs(face.headEulerAngleX)
+        val roll = abs(face.headEulerAngleZ)
+        val leftOpen = face.leftEyeOpenProbability ?: 0.5f
+        val rightOpen = face.rightEyeOpenProbability ?: 0.5f
+
+        if (yaw < 12.0f && pitch < 12.0f && roll < 12.0f && leftOpen > 0.40f && rightOpen > 0.40f) {
+            val qualityScore = (100.0f - (yaw * 3.0f + pitch * 3.0f + roll * 2.0f)) + (leftOpen + rightOpen) * 20.0f
+            if (qualityScore > bestFrameScore) {
+                if (sourceBitmap != null) {
+                    bestFrameScore = qualityScore
+                    bestFrameBitmap = sourceBitmap.copy(sourceBitmap.config ?: Bitmap.Config.ARGB_8888, true)
+                } else if (imageProxy != null) {
+                    try {
+                        val raw = try { imageProxy.toBitmap() } catch (e: Exception) { null }
+                        if (raw != null) {
+                            val rotated = if (rotationDegrees != 0) rotateBitmapHelper(raw, rotationDegrees) else raw
+                            bestFrameScore = qualityScore
+                            bestFrameBitmap = rotated
+                        }
+                    } catch (e: Exception) {
+                        // Ignore decode error
+                    }
+                }
+            }
+        }
 
         val elapsed = System.currentTimeMillis() - challengeStartTimeMs
         if (elapsed > CHALLENGE_TIMEOUT_MS) {
