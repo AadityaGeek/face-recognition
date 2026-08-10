@@ -1,6 +1,6 @@
 <div align="center">
 
-  <img src="https://raw.githubusercontent.com/AadityaGeek/face-recognition/refs/heads/main/app/src/main/ic_launcher-web.png" width="128" height="128" alt="Liveness Shield Logo" />
+  <img src="frontend/app/src/main/ic_launcher-web.png" width="128" height="128" alt="Liveness Shield Logo" />
 
   # 🛡️ Liveness Shield
   ### **Next-Gen Biometric Registration & AI-Powered Liveness Verification**
@@ -75,7 +75,7 @@ Whether deployed for KYC onboarding, access control, identity presentation demos
 
 | 1. User Registration | 2. Liveness Detection | 3. Verification Result |
 | :---: | :---: | :---: |
-| <img src="frontend/screenshots/registration.png" width="240" alt="Registration Screen" /> | <img src="frontend/screenshots/liveness.png" width="240" alt="Liveness Challenges" /> | <img src="frontend/screenshots/verification.png" width="240" alt="Verification Result" /> |
+| <img src="frontend/screenshots/registration.webp" width="240" alt="Registration Screen" /> | <img src="frontend/screenshots/liveness.webp" width="240" alt="Liveness Challenges" /> | <img src="frontend/screenshots/verification.webp" width="240" alt="Verification Result" /> |
 | *Profile Setup & Face Framing* | *Gesture & Anti-Spoofing Checks* | *Biometric Match Result* |
 
 ---
