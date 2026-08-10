@@ -7,7 +7,7 @@ import cv2
 import tempfile, os
 import time
 
-router = APIRouter()
+router = APIRouter(tags=["Biometric Verification"])
 COSINE_THRESHOLD = 0.40  # Cosine distance threshold for Facenet (distance <= 0.40 corresponds to >= 60% similarity)
 
 def detect_motion(video_path: str) -> tuple[bool, float]:
@@ -64,7 +64,16 @@ def detect_motion(video_path: str) -> tuple[bool, float]:
     return passed, max_diff
 
 
-@router.post("/verify")
+@router.post(
+    "/verify",
+    summary="Verify User Biometrics & Liveness",
+    description=(
+        "Verifies a user by accepting a target `user_id` and a live video clip or image upload. "
+        "Performs a motion liveness test on video frames, extracts 512-d DeepFace (Facenet) embeddings, "
+        "and computes Cosine Distance against the stored user vector in MongoDB."
+    ),
+    response_description="Verification verdict, similarity percentage score, liveness result, and matched user details"
+)
 def verify_user(user_id: str = Form(...), file: UploadFile = File(...)):
     t_start = time.perf_counter()
     print(f"\n--- [VERIFY START] user_id: {user_id} ---")
@@ -74,16 +83,16 @@ def verify_user(user_id: str = Form(...), file: UploadFile = File(...)):
         content = file.file.read()
 
         extracted_frame = None
-        # First, try decoding the upload directly as an in-memory image
+        # Step 1: Decode upload buffer (attempts in-memory image decode first)
         np_arr = np.frombuffer(content, np.uint8)
         extracted_frame = cv2.imdecode(np_arr, cv2.IMREAD_COLOR)
 
-        # If image decode fails, treat it as a video upload
+        # Step 1b: If image decoding returns None, treat upload as a video stream file
         if extracted_frame is None:
             filename = file.filename or "upload.mp4"
             ext = os.path.splitext(filename)[1].lower() or ".mp4"
 
-            # Create temp video file for OpenCV video stream reading
+            # Save to temporary file for OpenCV video stream reading & frame extraction
             tmp_fd, tmp_path = tempfile.mkstemp(suffix=ext)
             with os.fdopen(tmp_fd, "wb") as f:
                 f.write(content)
@@ -108,11 +117,11 @@ def verify_user(user_id: str = Form(...), file: UploadFile = File(...)):
             print("  [ERROR] Failed to decode image or video frame from upload")
             return {"verified": False, "is_live": False, "error": "Failed to decode image or video frame from upload"}
 
-        # Resize image for fast OpenCV face detection & feature extraction
+        # Step 2: Downscale frame to max 640px for fast face detection
         extracted_frame = resize_frame(extracted_frame, max_dim=640)
         print(f"  [1/4] File Read, Decode & Frame Resize: {(time.perf_counter() - t0)*1000:.1f} ms")
 
-        # Run motion liveness check (runs only if video file exists)
+        # Step 3: Motion-based liveness verification (evaluates video frame differences)
         t0 = time.perf_counter()
         is_live, motion_score = detect_motion(tmp_path) if tmp_path else (True, 0.0)
         print(f"  [2/4] Liveness Motion Check: {(time.perf_counter() - t0)*1000:.1f} ms (Passed: {is_live}, Score: {motion_score:.3f})")
@@ -125,7 +134,7 @@ def verify_user(user_id: str = Form(...), file: UploadFile = File(...)):
                 "motion_score": round(motion_score, 3)
             }
 
-        # Load user record from MongoDB with field projection (skips fetching heavy image binary)
+        # Step 4: Look up target user's stored embedding vector from MongoDB
         t0 = time.perf_counter()
         user = users_collection.find_one(
             {"user_id": user_id},
@@ -140,7 +149,7 @@ def verify_user(user_id: str = Form(...), file: UploadFile = File(...)):
             print("  [ERROR] User profile missing face biometric data")
             return {"verified": False, "is_live": True, "error": "User profile missing face biometric data"}
 
-        # Extract embedding from uploaded face frame
+        # Step 5: Extract 512-d embedding vector from uploaded face frame
         t0 = time.perf_counter()
         try:
             rep = DeepFace.represent(
@@ -160,7 +169,7 @@ def verify_user(user_id: str = Form(...), file: UploadFile = File(...)):
         incoming_vec = np.array(rep[0]["embedding"])
         stored_vec = np.array(user["embedding"])
 
-        # Compute Cosine Distance directly using pre-stored vector
+        # Step 6: Compute Cosine Distance & similarity percentage between vectors
         norm1 = np.linalg.norm(incoming_vec)
         norm2 = np.linalg.norm(stored_vec)
         if norm1 == 0 or norm2 == 0:
@@ -169,12 +178,12 @@ def verify_user(user_id: str = Form(...), file: UploadFile = File(...)):
             cos_sim = float(np.dot(incoming_vec, stored_vec) / (norm1 * norm2))
             distance = max(0.0, 1.0 - cos_sim)
 
-        # Convert cosine distance (0.0 = identical, 1.0 = completely different) to similarity percentage.
+        # Convert cosine distance to match similarity percentage (100% = identical, 0% = distinct)
         similarity = max(0.0, (1.0 - distance)) * 100.0
-        # Check against standard Facenet cosine distance threshold.
         verified = distance <= COSINE_THRESHOLD
         print(f"  [4/4] DeepFace Feature Extraction & Math: {(time.perf_counter() - t0)*1000:.1f} ms (Dist: {distance:.4f}, Match: {verified})")
 
+        # Step 7: Build verification response payload
         response = {
             "verified": verified,
             "score_percent": round(similarity, 2),

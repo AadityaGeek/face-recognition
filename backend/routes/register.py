@@ -10,18 +10,32 @@ from database.db import users_collection
 from models.user import User
 from utils.image_utils import resize_frame, cosine_similarity
 
-router = APIRouter()
+router = APIRouter(tags=["User Registration"])
 
 # threshold for duplicate detection (cosine similarity)
 DUPLICATE_THRESHOLD = 0.4  # 40%
 
 
-@router.get("/check-user-id")
+@router.get(
+    "/check-user-id",
+    summary="Check User ID Availability",
+    description="Checks whether a given `user_id` already exists in MongoDB database.",
+    response_description="JSON object indicating if the user_id exists"
+)
 def check_user_id(user_id: str):
     user = users_collection.find_one({"user_id": user_id}, {"_id": 1})
     return {"exists": user is not None, "user_id": user_id}
 
-@router.post("/register")
+@router.post(
+    "/register",
+    summary="Register New User Biometrics",
+    description=(
+        "Registers a new user by decoding the submitted facial image, extracting 512-d feature embeddings "
+        "using DeepFace (Facenet), verifying uniqueness against existing database records, saving user details to MongoDB, "
+        "and returning a Base64-encoded QR code."
+    ),
+    response_description="Status of registration and generated QR code base64 string"
+)
 def register_user(
     file: UploadFile,
     name: str = Form(...),
@@ -31,6 +45,7 @@ def register_user(
     t_start = time.perf_counter()
     print(f"\n--- [REGISTER START] user_id: {user_id} ---")
 
+    # Step 1: Read and decode image from upload buffer
     t0 = time.perf_counter()
     file_bytes = file.file.read()
     np_arr = np.frombuffer(file_bytes, np.uint8)
@@ -40,9 +55,11 @@ def register_user(
         print("  [ERROR] Invalid image provided.")
         return {"success": False, "error": "Invalid image"}
 
+    # Resize image to max 640px for optimal speed and accuracy balance
     img = resize_frame(img, max_dim=640)
     print(f"  [1/4] Image Read, Decode & Resize: {(time.perf_counter() - t0)*1000:.1f} ms")
 
+    # Step 2: Extract 512-d facial embedding using DeepFace (Facenet)
     try:
         t0 = time.perf_counter()
         embedding = DeepFace.represent(
@@ -56,7 +73,7 @@ def register_user(
         print(f"  [ERROR] Face embedding failed: {str(e)}")
         return {"success": False, "error": "No face detected in the image. Please provide a clear image with a visible face."}
 
-    # Check for duplicates using cosine similarity with projection (skips image_data transfer)
+    # Step 3: Check for duplicate registered faces (Projection skips fetching heavy raw image data)
     t0 = time.perf_counter()
     for existing in users_collection.find({}, {"embedding": 1, "user_id": 1, "name": 1, "age": 1}):
         if "embedding" not in existing:
@@ -75,7 +92,7 @@ def register_user(
             }
     print(f"  [3/4] Duplicate Check in DB: {(time.perf_counter() - t0)*1000:.1f} ms")
 
-    # Build user model
+    # Step 4: Construct user record and persist into MongoDB
     t0 = time.perf_counter()
     user = User(
         user_id=user_id,
@@ -89,7 +106,7 @@ def register_user(
         "image_data": Binary(file_bytes)
     })
 
-    # Generate QR code
+    # Step 5: Generate user registration QR code (Base64 PNG string)
     qr = qrcode.make(user_id)
     buf = io.BytesIO()
     qr.save(buf, format="PNG")
